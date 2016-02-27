@@ -125,6 +125,10 @@ struct PacketLexer {
         endIndex = self.payload.endIndex
     }
 
+    var hasContents: Bool {
+        return index < endIndex
+    }
+
     mutating func consumeCharacter() -> UnicodeScalar? {
         guard index < endIndex else {
             return nil

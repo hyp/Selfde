@@ -17,6 +17,18 @@ enum MemoryReadResult {
     case Bytes(UnsafeBufferPointer<UInt8>)
 }
 
+enum ThreadReference {
+    case ID(UInt) // NNN
+    case Any      // 0
+    case All      // -1
+}
+
+enum ThreadResumeAction: Int {
+    case Stop
+    case Continue
+    case Step
+}
+
 protocol Debugger: class {
     var registerContextSize: Int { get }
 
@@ -24,6 +36,8 @@ protocol Debugger: class {
 
     func killInferior() throws
     func getSharedLibraryInfoAddress() throws -> COpaquePointer
+
+    func resume(thread: ThreadReference, action: ThreadResumeAction, defaultAction: ThreadResumeAction, address: COpaquePointer?) throws
 
     // TODO: ref count up
     func setBreakpoint(address: COpaquePointer, byteSize: Int) throws

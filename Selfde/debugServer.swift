@@ -8,10 +8,12 @@ import Foundation
 enum ErrorResultKind {
     case E08
     case E09
+    case E25
     case E32
     case E44
     case E45
     case E47
+    case E49
     case E53
     case E54
     case E55
@@ -27,24 +29,28 @@ enum ParseResult {
     case Error(ErrorResultKind)
 }
 
-private enum ThreadState {
-    case ID(UInt) // NNN
-    case Any      // 0
-    case All      // -1
-}
-
 struct DebugServerState {
     let debugger: Debugger
     var registerState: DebuggerRegisterState
 
-    private var continueThread = ThreadState.All
-    private var currentThread = ThreadState.All
+    private var continueThread = ThreadReference.All
+    private var currentThread = ThreadReference.All
+
     private var currentThreadID: UInt {
         switch currentThread {
         case .ID(let id):
             return id
         case .Any, .All:
             return debugger.primaryThreadID
+        }
+    }
+
+    private var continueThreadID: UInt {
+        switch continueThread {
+        case .ID(let id):
+            return id
+        case .Any, .All:
+            return currentThreadID
         }
     }
 
@@ -195,7 +201,7 @@ private func handleSetCurrentThread(inout server: DebugServerState, payload: Str
     guard let type = lexer.consumeCharacter() where type == "c" || type == "g" else {
         return .Invalid("Missing type")
     }
-    let thread: ThreadState
+    let thread: ThreadReference
     if lexer.expectAndConsume("-") {
         guard lexer.expectAndConsume("1") else {
             return .Invalid("Invalid thread number")
@@ -230,6 +236,49 @@ private func handleCurrentThreadQuery(inout server: DebugServerState, payload: S
 private func handleVContQuery(inout server: DebugServerState, payload: String) -> ParseResult {
     // Support 'c' (continue) and 's' (step)
     return .Response("vCont;c;s")
+}
+
+// c [addr]
+private func handleContinue(inout server: DebugServerState, payload: String) -> ParseResult {
+    var parser = PacketLexer(payload: payload, offset: 1)
+    let address: COpaquePointer?
+    if parser.hasContents {
+        guard let addr = parser.expectAndConsumeHexBigEndianAddress() else {
+            return .Invalid("Invalid address")
+        }
+        address = addr
+    } else {
+        address = nil
+    }
+    do {
+        try server.debugger.resume(server.continueThread, action: .Continue, defaultAction: .Continue, address: address)
+        // Don't send an OK as the response is the stopped/exited message.
+        return .NoReply
+    } catch {
+        return .Error(.E25)
+    }
+}
+
+// s [addr]
+private func handleStep(inout server: DebugServerState, payload: String) -> ParseResult {
+    var parser = PacketLexer(payload: payload, offset: 1)
+    let address: COpaquePointer?
+    if parser.hasContents {
+        guard let addr = parser.expectAndConsumeHexBigEndianAddress() else {
+            return .Invalid("Invalid address")
+        }
+        address = addr
+    } else {
+        address = nil
+    }
+    do {
+        // Make all other threads stop when we are stepping.
+        try server.debugger.resume(.ID(server.continueThreadID), action: .Step, defaultAction: .Stop, address: address)
+        // Don't send an OK as the response is the stopped/exited message.
+        return .NoReply
+    } catch {
+        return .Error(.E49)
+    }
 }
 
 // z/Z packets control the breakpoints/watchpoints.
@@ -380,6 +429,8 @@ class DebugServer {
             ("P", handleRegisterWrite),
             ("g", handleGPRegistersRead),
             ("G", handleGPRegistersWrite),
+            ("c", handleContinue),
+            ("s", handleStep),
             ("z0", handleZ),
             ("Z0", handleZ),
             ("vCont?", handleVContQuery),
