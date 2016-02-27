@@ -27,11 +27,26 @@ enum ParseResult {
     case Error(ErrorResultKind)
 }
 
+private enum ThreadState {
+    case ID(UInt) // NNN
+    case Any      // 0
+    case All      // -1
+}
+
 struct DebugServerState {
     let debugger: Debugger
     var registerState: DebuggerRegisterState
 
-    private var currentThreadID: UInt?
+    private var continueThread = ThreadState.All
+    private var currentThread = ThreadState.All
+    private var currentThreadID: UInt {
+        switch currentThread {
+        case .ID(let id):
+            return id
+        case .Any, .All:
+            return debugger.primaryThreadID
+        }
+    }
 
     // Should we send/check for ACK/NACKs and worry about the checksum?
     private var noAckMode = false
@@ -174,29 +189,41 @@ private func handleDeallocate(inout server: DebugServerState, payload: String) -
 }
 
 // H packets select the current thread.
+// -1: All, 0: Any, NNN: Thread ID.
 private func handleSetCurrentThread(inout server: DebugServerState, payload: String) -> ParseResult {
     var lexer = PacketLexer(payload: payload, offset: 1)
     guard let type = lexer.consumeCharacter() where type == "c" || type == "g" else {
         return .Invalid("Missing type")
     }
-    guard let threadID = lexer.expectAndConsumeHexBigEndianInteger() else {
-        return .Invalid("Invalid thread number")
+    let thread: ThreadState
+    if lexer.expectAndConsume("-") {
+        guard lexer.expectAndConsume("1") else {
+            return .Invalid("Invalid thread number")
+        }
+        thread = .All
+    } else {
+        guard let threadID = lexer.expectAndConsumeHexBigEndianInteger() else {
+            return .Invalid("Invalid thread number")
+        }
+        thread = threadID == 0 ? .Any : .ID(threadID)
     }
-    do {
-        // Continue vs current?
-        // TODO try debugger.setCurrentThread(threadID)
-        server.currentThreadID = threadID
-        return .OK
-    } catch {
-        // Is this right?
-        return .Error(.E09)
+    switch type {
+    case "c":
+        server.continueThread = thread
+    case "g":
+        server.currentThread = thread
+    default:
+        assertionFailure()
     }
+    return .OK
 }
 
 // Return the current thread ID for qC packets.
 private func handleCurrentThreadQuery(inout server: DebugServerState, payload: String) -> ParseResult {
-    // TODO: set current thread.
-    return .Response("QC\(String(0, radix: 16, uppercase: false))")
+    let threadID = server.currentThreadID
+    // Set the current thread as well to override the .Any and .All states.
+    server.currentThread = .ID(threadID)
+    return .Response("QC\(String(threadID, radix: 16, uppercase: false))")
 }
 
 // vCont?

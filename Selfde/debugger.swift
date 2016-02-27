@@ -20,6 +20,8 @@ enum MemoryReadResult {
 protocol Debugger: class {
     var registerContextSize: Int { get }
 
+    var primaryThreadID: UInt { get }
+
     func killInferior() throws
     func getSharedLibraryInfoAddress() throws -> COpaquePointer
 

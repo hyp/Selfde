@@ -125,7 +125,11 @@ class SelfdeTests: XCTestCase {
                 self.expectedRegisterContextReads = expectedRegisterContextReads
                 self.expectedRegisterContextWrites = expectedRegisterContextWrites
             }
-            
+
+            var primaryThreadID: UInt {
+                return 12
+            }
+
             func setBreakpoint(address: COpaquePointer, byteSize: Int) throws {
                 guard let bp = expectedSetBreakpoints.first else {
                     throw MockError.NotExpected
@@ -259,7 +263,7 @@ class SelfdeTests: XCTestCase {
             return result
         }
 
-        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34])], expectedRegisterReads: [(0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]))
+        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]))
 
         XCTAssertEqual(server.handlePacketPayload("foo"), ParseResult.Unimplemented)
         XCTAssertEqual(server.handlePacketPayload(""), ParseResult.Unimplemented)
@@ -307,7 +311,7 @@ class SelfdeTests: XCTestCase {
         #endif
 
         // Register read/write
-        XCTAssert(server.handlePacketPayload("p0").isInvalid)
+        XCTAssertEqual(server.handlePacketPayload("p0"), ParseResult.Response("0000000000000000"))
         XCTAssertEqual(server.handlePacketPayload("QThreadSuffixSupported"), ParseResult.OK)
         XCTAssert(server.handlePacketPayload("p").isInvalid)
         XCTAssertEqual(server.handlePacketPayload("pffffff;thread:0;"), ParseResult.Error(.E47))
@@ -333,12 +337,23 @@ class SelfdeTests: XCTestCase {
         XCTAssertEqual(server.handlePacketPayload("GFaF1000000000000ffffffffffffff7f0000000000000000;thread:42;"), ParseResult.OK)
 
         // Thread commands
-        XCTAssertEqual(server.handlePacketPayload("qC"), ParseResult.Response("QC0"))
-        // TODO
-        XCTAssertEqual(server.handlePacketPayload("Hc0"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("qC"), ParseResult.Response("QCc"))
         XCTAssertEqual(server.handlePacketPayload("Hg0"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("qC"), ParseResult.Response("QCc"))
+        XCTAssertEqual(server.handlePacketPayload("Hg30"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("qC"), ParseResult.Response("QC30"))
+        XCTAssertEqual(server.handlePacketPayload("Hg0"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("qC"), ParseResult.Response("QCc"))
+        XCTAssertEqual(server.handlePacketPayload("Hg40"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("qC"), ParseResult.Response("QC40"))
+        XCTAssertEqual(server.handlePacketPayload("Hg-1"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("qC"), ParseResult.Response("QCc"))
+        XCTAssertEqual(server.handlePacketPayload("Hc40"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("Hc0"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("Hc-1"), ParseResult.OK)
         XCTAssert(server.handlePacketPayload("Ha").isInvalid)
-        XCTAssert(server.handlePacketPayload("Hc-1").isInvalid)
+        XCTAssert(server.handlePacketPayload("Hc-").isInvalid)
+        XCTAssert(server.handlePacketPayload("Hc-2").isInvalid)
 
         // Stop info
 
