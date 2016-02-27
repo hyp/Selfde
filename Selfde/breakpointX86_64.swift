@@ -3,6 +3,8 @@
 //  Selfde
 //
 
+#if arch(x86_64) || arch(i386)
+
 typealias MachineBreakpointState = BreakpointStateX86_64
 
 struct BreakpointStateX86_64 {
@@ -29,3 +31,5 @@ struct BreakpointStateX86_64 {
         return 1
     }
 }
+
+#endif

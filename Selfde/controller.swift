@@ -11,6 +11,9 @@ public enum ControllerError: ErrorType {
     case BreakpointAlreadyInstalled
     case InvalidBreakpoint
     case InvalidRunState
+    case InvalidRegisterID
+    case InvalidRegisterSetID
+    case RegisterBufferIsTooSmall
 }
 
 public struct Breakpoint {
@@ -37,6 +40,14 @@ public protocol Thread {
 
     /// Returns the thread's stack pointer.
     func getStackPointer() throws -> COpaquePointer
+
+    func getRegisterValue(id: UInt32, setID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8>
+
+    func setRegisterValue(id: UInt32, setID: UInt32, source: ArraySlice<UInt8>) throws
+
+    func getRegisterContext(inout dest: [UInt8]) throws -> ArraySlice<UInt8>
+
+    func setRegisterContext(source: ArraySlice<UInt8>) throws
 
     func beginSingleStepMode() throws
 

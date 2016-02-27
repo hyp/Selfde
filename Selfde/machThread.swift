@@ -17,6 +17,10 @@ public func !=(lhs: Thread, rhs: Thread) -> Bool {
     return lhs.opaqueValue != rhs.opaqueValue
 }
 
+public func getRegisterContextSize() -> Int {
+    return MachMachineThread.registerContextSize
+}
+
 struct MachThread: Thread {
     private var impl: MachMachineThread
     private var thread: mach_port_t {
@@ -37,6 +41,22 @@ struct MachThread: Thread {
 
     func getStackPointer() throws -> COpaquePointer {
         return try impl.getStackPointer()
+    }
+
+    func getRegisterValue(id: UInt32, setID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+        return try impl.getRegisterValue(id, setID: setID, dest: &dest)
+    }
+
+    func setRegisterValue(id: UInt32, setID: UInt32, source: ArraySlice<UInt8>) throws {
+        return try impl.setRegisterValue(id, setID: setID, source: source)
+    }
+
+    func getRegisterContext(inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+        return try impl.getRegisterContext(&dest)
+    }
+
+    func setRegisterContext(source: ArraySlice<UInt8>) throws {
+        return try impl.setRegisterContext(source)
     }
 
     func beginSingleStepMode() throws {
