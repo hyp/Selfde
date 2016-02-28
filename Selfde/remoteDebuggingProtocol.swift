@@ -67,7 +67,7 @@ extension CollectionType where Self.Generator.Element == UInt8 {
     }
 }
 
-func parsePacketPayload(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> PacketPayloadResult {
+func parseRawPacket(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> PacketPayloadResult {
     guard let first = data.first else {
         // Empty packet, ignore.
         return .None

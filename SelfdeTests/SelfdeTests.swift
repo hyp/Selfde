@@ -83,7 +83,7 @@ class SelfdeTests: XCTestCase {
 
         func parsePacket(s: String) -> PacketPayloadResult {
             let bytes = s.utf8.map { UInt8($0) }
-            return parsePacketPayload(bytes[0..<bytes.count])
+            return parseRawPacket(bytes[0..<bytes.count])
         }
 
         XCTAssertEqual(parsePacket(""), PacketPayloadResult.None)
