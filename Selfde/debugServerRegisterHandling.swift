@@ -109,7 +109,6 @@ struct DebuggerRegisterState {
     init(debugger: Debugger) {
         registerSets = getRegisterSets()
         registers = getRegisterEntries(registerSets)
-        // FIXME: hook into the debugger?
         valueStorage = [UInt8](count: debugger.registerContextSize, repeatedValue: 0)
     }
 }
