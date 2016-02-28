@@ -6,6 +6,7 @@
 import Foundation
 
 enum ErrorResultKind {
+    case E01
     case E08
     case E09
     case E25
@@ -24,7 +25,8 @@ enum ParseResult {
     case NoReply
     case OK
     case Response(String)
-    case WaitForThreadEvent
+    case WaitForThreadStopReply
+    case ThreadStopReply
     case Unimplemented
     case Invalid(String)
     case Error(ErrorResultKind)
@@ -295,7 +297,7 @@ private func handleVCont(inout server: DebugServerState, payload: String) -> Par
     do {
         try server.debugger.resume(actions, defaultAction: defaultAction ?? .Stop)
         // The response will be the stopped/exited message.
-        return .WaitForThreadEvent
+        return .WaitForThreadStopReply
     } catch {
         return .Error(.E25)
     }
@@ -316,7 +318,7 @@ private func handleContinue(inout server: DebugServerState, payload: String) -> 
     do {
         try server.debugger.resume([ ThreadResumeEntry(thread: server.continueThread, action: .Continue, address: address) ], defaultAction: .Continue)
         // Don't send an OK as the response is the stopped/exited message.
-        return .WaitForThreadEvent
+        return .WaitForThreadStopReply
     } catch {
         return .Error(.E25)
     }
@@ -338,7 +340,7 @@ private func handleStep(inout server: DebugServerState, payload: String) -> Pars
         // Make all other threads stop when we are stepping.
         try server.debugger.resume([ ThreadResumeEntry(thread: .ID(server.continueThreadID), action: .Step, address: address) ], defaultAction: .Stop)
         // Don't send an OK as the response is the stopped/exited message.
-        return .WaitForThreadEvent
+        return .WaitForThreadStopReply
     } catch {
         return .Error(.E49)
     }
@@ -466,13 +468,20 @@ private func handleQEcho(inout server: DebugServerState, payload: String) -> Par
 }
 
 // vAttach
-//, vAttachOrWait, vAttachName, vAttachWait
+// Note: vAttachOrWait, vAttachName, vAttachWait aren't supported.
 private func handleVAttach(inout server: DebugServerState, payload: String) -> ParseResult {
-    // Do nothing
-    // TODO:
-    /// NotifyThatProcessStopped ();
-    //return rnb_success;
-    return .Unimplemented
+    var parser = PacketLexer(payload: payload, offset: "vAttach;".characters.count)
+    guard let processID = parser.expectAndConsumeHexBigEndianInteger() else {
+        return .Invalid("No PID given")
+    }
+    do {
+        try server.debugger.attach(Int(processID))
+        // Send a stop reply packet.
+        return .ThreadStopReply
+    } catch {
+        // E01 is the attachment failure error.
+        return .Error(.E01)
+    }
 }
 
 // Implements a debug server that's partially compatible with the GDB remote protocol and supports a couple of LLDB extensions.
@@ -498,6 +507,7 @@ class DebugServer {
             ("Z0", handleZ),
             ("vCont?", handleVContQuery),
             ("vCont", handleVCont),
+            ("vAttach;", handleVAttach),
             ("H", handleSetCurrentThread),
             ("qC", handleCurrentThreadQuery),
             ("_M", handleAllocate),
@@ -533,7 +543,7 @@ class DebugServer {
             send("OK")
         case .Response(let r):
             send(r)
-        case .WaitForThreadEvent:
+        case .WaitForThreadStopReply, .ThreadStopReply:
             break
         case .Unimplemented:
             send("")

@@ -132,6 +132,10 @@ class SelfdeTests: XCTestCase {
                 return 12
             }
 
+            func attach(processID: Int) throws {
+                XCTAssertEqual(processID, 0x12345)
+            }
+
             func resume(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction) throws {
                 guard let value = expectedResumes.first else {
                     throw MockError.NotExpected
@@ -381,30 +385,33 @@ class SelfdeTests: XCTestCase {
         XCTAssert(server.handlePacketPayload("Hc-2").isInvalid)
 
         // Continue/step
-        XCTAssertEqual(server.handlePacketPayload("c"), ParseResult.WaitForThreadEvent)
-        XCTAssertEqual(server.handlePacketPayload("c0"), ParseResult.WaitForThreadEvent)
-        XCTAssertEqual(server.handlePacketPayload("c4000"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("c"), ParseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("c0"), ParseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("c4000"), ParseResult.WaitForThreadStopReply)
         XCTAssertEqual(server.handlePacketPayload("Hc40"), ParseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("c"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("c"), ParseResult.WaitForThreadStopReply)
         XCTAssert(server.handlePacketPayload("c=").isInvalid)
-        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadEvent)
-        XCTAssertEqual(server.handlePacketPayload("s123456789ab"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("s123456789ab"), ParseResult.WaitForThreadStopReply)
         XCTAssertEqual(server.handlePacketPayload("Hc0"), ParseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadStopReply)
         XCTAssertEqual(server.handlePacketPayload("Hc-1"), ParseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadStopReply)
         // vCont as well..
-        XCTAssertEqual(server.handlePacketPayload("vCont;c"), ParseResult.WaitForThreadEvent)
-        XCTAssertEqual(server.handlePacketPayload("vCont;s"), ParseResult.WaitForThreadEvent)
-        XCTAssertEqual(server.handlePacketPayload("vCont;c:404"), ParseResult.WaitForThreadEvent)
-        XCTAssertEqual(server.handlePacketPayload("vCont;s:20"), ParseResult.WaitForThreadEvent)
-        XCTAssertEqual(server.handlePacketPayload("vCont;c;s:20"), ParseResult.WaitForThreadEvent)
-        XCTAssertEqual(server.handlePacketPayload("vCont;s;c:40"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("vCont;c"), ParseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s"), ParseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("vCont;c:404"), ParseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s:20"), ParseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("vCont;c;s:20"), ParseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s;c:40"), ParseResult.WaitForThreadStopReply)
         XCTAssert(server.handlePacketPayload("vCont").isInvalid)
         XCTAssert(server.handlePacketPayload("vCont;").isInvalid)
         XCTAssert(server.handlePacketPayload("vCont;a").isInvalid)
         XCTAssert(server.handlePacketPayload("vCont;c:").isInvalid)
 
+        // vAttach
+        XCTAssertEqual(server.handlePacketPayload("vAttach;12345"), ParseResult.ThreadStopReply)
+        XCTAssert(server.handlePacketPayload("vAttach;").isInvalid)
 
         // Stop info
 
@@ -455,7 +462,7 @@ extension ParseResult: Equatable { }
 
 func == (lhs: ParseResult, rhs: ParseResult) -> Bool {
     switch (lhs, rhs) {
-    case (.NoReply, .NoReply), (.OK, .OK), (.Unimplemented, .Unimplemented), (.Invalid, .Invalid), (.Error, .Error), (.WaitForThreadEvent, .WaitForThreadEvent):
+    case (.NoReply, .NoReply), (.OK, .OK), (.Unimplemented, .Unimplemented), (.Invalid, .Invalid), (.Error, .Error), (.WaitForThreadStopReply, .WaitForThreadStopReply), (.ThreadStopReply, .ThreadStopReply):
         return true
     case (.Response(let x), .Response(let y)):
         return x == y

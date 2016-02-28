@@ -41,6 +41,7 @@ protocol Debugger: class {
 
     var primaryThreadID: UInt { get }
 
+    func attach(processID: Int) throws
     func killInferior() throws
     func getSharedLibraryInfoAddress() throws -> COpaquePointer
 
