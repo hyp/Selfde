@@ -55,6 +55,17 @@ enum PacketPayloadResult {
     case InvalidPacket
 }
 
+extension CollectionType where Self.Generator.Element == UInt8 {
+    // Remote debugging protocol checksum.
+    private var checksum: UInt8 {
+        var computedChecksum: UInt8 = 0
+        for byte in self {
+            computedChecksum = computedChecksum &+ byte // MOD 256.
+        }
+        return computedChecksum
+    }
+}
+
 func parsePacketPayload(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> PacketPayloadResult {
     guard let first = data.first else {
         // Empty packet, ignore.
@@ -79,11 +90,7 @@ func parsePacketPayload(data: ArraySlice<UInt8>, checkChecksums: Bool = true) ->
             }
             
             // Compute the checksum.
-            var computedChecksum: UInt8 = 0
-            for byte in payload {
-                computedChecksum = computedChecksum &+ byte // MOD 256.
-            }
-            if checksum != Int(computedChecksum) {
+            if checksum != Int(payload.checksum) {
                 return .InvalidChecksum
             }
         }
