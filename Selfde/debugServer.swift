@@ -516,13 +516,6 @@ private func handleQProcessInfo(inout server: DebugServerState, payload: String)
     return .Response(result)
 }
 
-private func handleQStartNoAckMode(inout server: DebugServerState, payload: String) -> ParseResult {
-    // Send OK before changing the flag.
-    // TODO: server.sendResponse(.OK)
-    server.noAckMode = true
-    return .NoReply
-}
-
 private func handleQEcho(inout server: DebugServerState, payload: String) -> ParseResult {
     // Send back the payload.
     return .Response(payload)
@@ -581,7 +574,12 @@ class DebugServer {
             ("qHostInfo", handleQHostInfo),
             ("qProcessInfo", handleQProcessInfo),
             ("QThreadSuffixSupported", handleQThreadSuffixSupported),
-            ("QStartNoAckMode", handleQStartNoAckMode),
+            ("QStartNoAckMode", { [unowned self] server, payload in
+                // Send OK before changing the flag.
+                self.sendResponse(.OK)
+                server.noAckMode = true
+                return .NoReply
+            }),
             ("qEcho:", handleQEcho),
             ("k", handleK)
         ]
