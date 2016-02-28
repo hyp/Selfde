@@ -15,6 +15,7 @@ enum ErrorResultKind {
     case E45
     case E47
     case E49
+    case E51
     case E53
     case E54
     case E55
@@ -28,7 +29,7 @@ enum ParseResult {
     case Response(String)
     case WaitForThreadStopReply
     case ThreadStopReply
-    case StopReplyForThread(UInt)
+    case StopReplyForThread(ThreadID)
     case Unimplemented
     case Invalid(String)
     case Error(ErrorResultKind)
@@ -42,7 +43,7 @@ struct DebugServerState {
     private var continueThread = ThreadReference.All
     private var currentThread = ThreadReference.All
 
-    private var currentThreadID: UInt {
+    private var currentThreadID: ThreadID {
         switch currentThread {
         case .ID(let id):
             return id
@@ -51,7 +52,7 @@ struct DebugServerState {
         }
     }
 
-    private var continueThreadID: UInt {
+    private var continueThreadID: ThreadID {
         switch continueThread {
         case .ID(let id):
             return id
@@ -74,7 +75,7 @@ struct DebugServerState {
 
 extension DebugServerState {
     // Extracts the 'thread:NNN' suffix or returns the current thread ID.
-    mutating func extractThreadID(payload: String) -> UInt? {
+    mutating func extractThreadID(payload: String) -> ThreadID? {
         guard threadSuffixSupported else {
             return currentThreadID
         }
@@ -85,7 +86,7 @@ extension DebugServerState {
         guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
             return nil
         }
-        return threadID
+        return ThreadID(threadID)
     }
 }
 
@@ -221,7 +222,7 @@ extension PacketParser {
             guard let threadID = expectAndConsumeHexBigEndianInteger() else {
                 return .None(.Invalid("Invalid thread number"))
             }
-            return .Some(threadID == 0 ? .Any : .ID(threadID))
+            return .Some(threadID == 0 ? .Any : .ID(ThreadID(threadID)))
         }
     }
 }
@@ -265,7 +266,7 @@ private func handleQThreadStopInfo(inout server: DebugServerState, payload: Stri
     guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("No thread id given")
     }
-    return .StopReplyForThread(threadID)
+    return .StopReplyForThread(ThreadID(threadID))
 }
 
 // vCont?
@@ -612,6 +613,74 @@ class DebugServer {
         return .Unimplemented
     }
 
+    private func handleStopReplyForThread(threadID: ThreadID) -> ParseResult {
+        let info: ThreadStopInfo
+        do {
+            info = try state.debugger.getStopInfoForThread(threadID)
+        } catch {
+            return .Error(.E51)
+        }
+        var result = "T"
+        let signal = [info.signalNumber]
+        result += signal.hexString
+        result += "thread:\(String(threadID, radix: 16, uppercase: false));"
+        // Dispatch Queue Address.
+        if let address = info.dispatchQueueAddress {
+            result += "qaddr:\(address.bigEndianHexString);"
+        }
+        // TODO: name/hexname?
+        // Threads.
+        if state.listThreadsInStopReply {
+            let threads = state.debugger.threads
+            result += "threads:"
+            for (i, threadID) in threads.enumerate() {
+                if i > 0 { result += "," }
+                result += String(threadID, radix: 16, uppercase: false)
+            }
+            result += ";"
+            do {
+                var output = ""
+                for (i, threadID) in threads.enumerate() {
+                    if i > 0 { output += "," }
+                    output += try state.debugger.getIPRegisterValueForThread(threadID).bigEndianHexString
+                }
+                result += "thread-pcs:\(output);"
+            } catch {
+            }
+        }
+        // Registers.
+        do {
+            try state.registerState.emitThreadStopInfoRegistersForThread(threadID, debugger: state.debugger, dest: &result)
+        } catch {
+            // TODO: Log
+            print("Failed to emit register info in stop reply")
+        }
+        // Mach info.
+        if let machInfo = info.machInfo {
+            result += "metype:\(String(machInfo.exceptionType, radix: 16, uppercase: false));"
+            result += "mecount:\(String(machInfo.exceptionData.count, radix: 16, uppercase: false));"
+            for i in machInfo.exceptionData {
+                result += "medata:\(String(i, radix: 16, uppercase: false));"
+            }
+        }
+        // TODO: Support 'memory' for quicket backtracking?
+        return .Response(result)
+    }
+
+    func handleStopReply(result: ParseResult) -> ParseResult {
+        switch result {
+        case .ThreadStopReply, .WaitForThreadStopReply:
+            let threadID = state.debugger.primaryThreadID
+            state.currentThread = .ID(threadID)
+            return handleStopReplyForThread(threadID)
+        case .StopReplyForThread(let threadID):
+            return handleStopReplyForThread(threadID)
+        default:
+            assertionFailure("Invalid stop reply")
+            return .NoReply
+        }
+    }
+
     func sendResponse(result: ParseResult) {
         func send(s: String) {
         }
@@ -623,7 +692,7 @@ class DebugServer {
         case .Response(let r):
             send(r)
         case .WaitForThreadStopReply, .ThreadStopReply, .StopReplyForThread:
-            break
+            sendResponse(handleStopReply(result))
         case .Unimplemented:
             send("")
         case .Invalid:

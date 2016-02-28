@@ -111,6 +111,19 @@ struct DebuggerRegisterState {
         registers = getRegisterEntries(registerSets)
         valueStorage = [UInt8](count: debugger.registerContextSize, repeatedValue: 0)
     }
+
+    mutating func emitThreadStopInfoRegistersForThread(threadID: ThreadID, debugger: Debugger, inout dest: String) throws {
+        for register in registers {
+            // Only emit the GPR registers that aren't contained in other registers.
+            // FIXME: Make this better.
+            if register.info.set == 1 && register.info.value_regs == nil {
+                assert(register.debugServerRegisterNumber <= Int(UInt8.max))
+                let number = [UInt8(truncatingBitPattern: register.debugServerRegisterNumber)]
+                let bytes = try debugger.getRegisterValueForThread(threadID, registerID: register.info.reg, registerSetID: register.info.set, dest: &valueStorage)
+                dest += "\(number.hexString):\(bytes.hexString);"
+            }
+        }
+    }
 }
 
 // qRegisterInfo can be used to query the register set.

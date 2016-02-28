@@ -102,7 +102,7 @@ class SelfdeTests: XCTestCase {
     func testRemoteDebuggingPacketHandling() {
         enum MockError: ErrorType { case NotExpected }
         
-        final class MockDebugger: Debugger {
+        class MockDebugger: Debugger {
             var expectedResumes: [([ThreadResumeEntry], ThreadResumeAction)]
             var expectedSetBreakpoints: [(UInt, Int)] = []
             var removeBreakpoint: [UInt] = []
@@ -110,12 +110,12 @@ class SelfdeTests: XCTestCase {
             var expectedDeallocates: [COpaquePointer]
             var expectedMemoryReads: [(UInt, Int)]
             var expectedMemoryWrites:[(UInt, [UInt8])]
-            var expectedRegisterReads: [(UInt, UInt32, UInt32, UInt64)]
-            var expectedRegisterWrites: [(UInt, UInt32, UInt32, UInt64)]
-            var expectedRegisterContextReads: [(UInt, [UInt8])]
-            var expectedRegisterContextWrites: [(UInt, [UInt8])]
+            var expectedRegisterReads: [(ThreadID, UInt32, UInt32, UInt64)]
+            var expectedRegisterWrites: [(ThreadID, UInt32, UInt32, UInt64)]
+            var expectedRegisterContextReads: [(ThreadID, [UInt8])]
+            var expectedRegisterContextWrites: [(ThreadID, [UInt8])]
             
-            init(expectedResumes: [([ThreadResumeEntry], ThreadResumeAction)] = [], expectedSetBreakpoints: [(UInt, Int)] = [], expectedAllocates: [(Int, MemoryPermissions)] = [], expectedDeallocates: [COpaquePointer] = [], expectedMemoryReads: [(UInt, Int)] = [], expectedMemoryWrites: [(UInt, [UInt8])] = [], expectedRegisterReads: [(UInt, UInt32, UInt32, UInt64)] = [], expectedRegisterWrites: [(UInt, UInt32, UInt32, UInt64)] = [], expectedRegisterContextReads: [(UInt, [UInt8])] = [], expectedRegisterContextWrites: [(UInt, [UInt8])] = []) {
+            init(expectedResumes: [([ThreadResumeEntry], ThreadResumeAction)] = [], expectedSetBreakpoints: [(UInt, Int)] = [], expectedAllocates: [(Int, MemoryPermissions)] = [], expectedDeallocates: [COpaquePointer] = [], expectedMemoryReads: [(UInt, Int)] = [], expectedMemoryWrites: [(UInt, [UInt8])] = [], expectedRegisterReads: [(ThreadID, UInt32, UInt32, UInt64)] = [], expectedRegisterWrites: [(ThreadID, UInt32, UInt32, UInt64)] = [], expectedRegisterContextReads: [(ThreadID, [UInt8])] = [], expectedRegisterContextWrites: [(ThreadID, [UInt8])] = []) {
                 self.expectedResumes = expectedResumes
                 self.expectedSetBreakpoints = expectedSetBreakpoints
                 self.expectedAllocates = expectedAllocates
@@ -128,8 +128,12 @@ class SelfdeTests: XCTestCase {
                 self.expectedRegisterContextWrites = expectedRegisterContextWrites
             }
 
-            var primaryThreadID: UInt {
+            var primaryThreadID: ThreadID {
                 return 12
+            }
+
+            var threads: [ThreadID] {
+                return [primaryThreadID]
             }
 
             func attach(processID: Int) throws {
@@ -141,7 +145,12 @@ class SelfdeTests: XCTestCase {
                     throw MockError.NotExpected
                 }
                 expectedResumes.removeFirst()
-                XCTAssert(value.0 == actions)
+                XCTAssertEqual(value.0, actions)
+            }
+
+            func getStopInfoForThread(threadID: ThreadID) throws -> ThreadStopInfo {
+                XCTFail()
+                return ThreadStopInfo(signalNumber: 0, dispatchQueueAddress: nil, machInfo: nil)
             }
 
             func setBreakpoint(address: COpaquePointer, byteSize: Int) throws {
@@ -207,9 +216,13 @@ class SelfdeTests: XCTestCase {
                 XCTAssertEqual(value.1.count, bytes.count)
                 XCTAssert(zip(value.1, bytes).reduce(true) { $0 ? $1.0 == $1.1 : false })
             }
-            
+
+            func getIPRegisterValueForThread(threadID: ThreadID) throws -> COpaquePointer {
+                return COpaquePointer(bitPattern: 0xdeadbeef)
+            }
+
             #if arch(x86_64)
-            func getRegisterValueForThread(threadID: UInt, registerID: UInt32, registerSetID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+            func getRegisterValueForThread(threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
                 guard let value = expectedRegisterReads.first else {
                     throw MockError.NotExpected
                 }
@@ -224,7 +237,7 @@ class SelfdeTests: XCTestCase {
                 return dest.prefix(8)
             }
 
-            func setRegisterValueForThread(threadID: UInt, registerID: UInt32, registerSetID: UInt32, source: ArraySlice<UInt8>) throws {
+            func setRegisterValueForThread(threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, source: ArraySlice<UInt8>) throws {
                 guard let value = expectedRegisterWrites.first else {
                     throw MockError.NotExpected
                 }
@@ -244,7 +257,7 @@ class SelfdeTests: XCTestCase {
                 return sizeof(UInt64) * 3
             }
         
-            func getRegisterContextForThread(threadID: UInt, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+            func getRegisterContextForThread(threadID: ThreadID, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
                 guard let value = expectedRegisterContextReads.first else {
                     throw MockError.NotExpected
                 }
@@ -256,7 +269,7 @@ class SelfdeTests: XCTestCase {
                 return dest.prefix(value.1.count)
             }
         
-            func setRegisterContextForThread(threadID: UInt, source: ArraySlice<UInt8>) throws {
+            func setRegisterContextForThread(threadID: ThreadID, source: ArraySlice<UInt8>) throws {
                 guard let value = expectedRegisterContextWrites.first else {
                     throw MockError.NotExpected
                 }
@@ -449,6 +462,47 @@ class SelfdeTests: XCTestCase {
             XCTFail()
         }
         XCTAssertEqual(server.handlePacketPayload("?"), ParseResult.ThreadStopReply)
+
+        // Stop replys
+        do {
+            #if arch(x86_64)
+            class StopMockDebugger: MockDebugger {
+                var expectedThreadStopInfos: [(ThreadID, ThreadStopInfo)]
+
+                init(expectedThreadStopInfos: [(ThreadID, ThreadStopInfo)]) {
+                    self.expectedThreadStopInfos = expectedThreadStopInfos
+                    super.init()
+                }
+
+                override func getStopInfoForThread(threadID: ThreadID) throws -> ThreadStopInfo {
+                    guard let value = expectedThreadStopInfos.first else {
+                        throw MockError.NotExpected
+                    }
+                    expectedThreadStopInfos.removeFirst()
+                    XCTAssertEqual(value.0, threadID)
+                    return value.1
+                }
+
+                override func getRegisterValueForThread(threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+                    dest.withUnsafeMutableBufferPointer { (inout ptr: UnsafeMutableBufferPointer<UInt8>) in
+                        UnsafeMutablePointer<UInt64>(ptr.baseAddress).memory = 0x1234567812345678
+                    }
+                    return dest.prefix(8)
+                }
+            }
+            let server = DebugServer(debugger: StopMockDebugger(expectedThreadStopInfos: [
+                (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: nil, machInfo: nil)),
+                (0x689, ThreadStopInfo(signalNumber: 0x20, dispatchQueueAddress: nil, machInfo: nil)),
+                (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: COpaquePointer(bitPattern: 0xabc), machInfo: ThreadStopInfo.MachInfo(exceptionType: 0x40, exceptionData: [0x2,0xFFFF]))),
+                (0xc, ThreadStopInfo(signalNumber: 0xf0, dispatchQueueAddress: nil, machInfo: nil))
+            ]))
+            XCTAssertEqual(server.handleStopReply(ParseResult.ThreadStopReply), ParseResult.Response("T05thread:c;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
+            XCTAssertEqual(server.handleStopReply(ParseResult.StopReplyForThread(0x689)), ParseResult.Response("T20thread:689;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
+            XCTAssertEqual(server.handleStopReply(ParseResult.ThreadStopReply), ParseResult.Response("T05thread:c;qaddr:abc;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;metype:40;mecount:2;medata:2;medata:ffff;"))
+            XCTAssertEqual(server.handlePacketPayload("QListThreadsInStopReply"), ParseResult.OK)
+            XCTAssertEqual(server.handleStopReply(ParseResult.ThreadStopReply), ParseResult.Response("Tf0thread:c;threads:c;thread-pcs:deadbeef;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
+            #endif
+        }
     }
 }
 
