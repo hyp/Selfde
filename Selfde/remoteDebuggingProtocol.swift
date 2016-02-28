@@ -106,20 +106,17 @@ func parsePacketPayload(data: ArraySlice<UInt8>) -> PacketPayloadResult {
 
 // Parses the debugger packet payloads.
 struct PacketParser {
-    private let payloadString: String
     private let payload: String.UnicodeScalarView
     private var index: String.UnicodeScalarIndex
     private let endIndex: String.UnicodeScalarIndex
     
     init(payload: String, offset: Int = 0) {
-        self.payloadString = payload
         self.payload = payload.unicodeScalars
         index = self.payload.startIndex.advancedBy(offset)
         endIndex = self.payload.endIndex
     }
 
     init(payload: String, offset: String.Index) {
-        self.payloadString = payload
         self.payload = payload.unicodeScalars
         index = offset.samePositionIn(self.payload)
         endIndex = self.payload.endIndex
