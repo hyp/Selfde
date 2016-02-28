@@ -425,13 +425,7 @@ private func handleQSymbol(inout server: DebugServerState, payload: String) -> P
 
 private func handleQSupported(inout server: DebugServerState, payload: String) -> ParseResult {
     // Don't care about the payload here.
-    return .Response("qXfer:features:read+;PacketSize=20000;qEcho+")
-}
-
-private func handleQXfer(inout server: DebugServerState, payload: String) -> ParseResult {
-    // TODO: feature feature:read:target.xml
-    // XML registers
-    return .OK
+    return .Response("PacketSize=20000;qEcho+")
 }
 
 // This will enabled thread suffix for the 'g', 'G', 'p', and 'P' commands.

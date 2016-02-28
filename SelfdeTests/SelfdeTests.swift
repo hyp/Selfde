@@ -425,7 +425,6 @@ class SelfdeTests: XCTestCase {
         XCTAssertEqual(server.handlePacketPayload("qSymbol:64697370617463685f71756575655f6f666673657473"), ParseResult.OK)
         server.handlePacketPayload("qSupported")
         server.handlePacketPayload("qSupported:xmlRegisters=arm")
-        // TODO: qXfer:features:read
         switch server.handlePacketPayload("qHostInfo") {
         case .Response(let response):
             XCTAssertNotNil(response.rangeOfString("cputype:"))
