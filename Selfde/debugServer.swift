@@ -24,6 +24,7 @@ enum ParseResult {
     case NoReply
     case OK
     case Response(String)
+    case WaitForThreadEvent
     case Unimplemented
     case Invalid(String)
     case Error(ErrorResultKind)
@@ -194,6 +195,27 @@ private func handleDeallocate(inout server: DebugServerState, payload: String) -
     }
 }
 
+private enum ValueParseResult<T> {
+    case None(ParseResult)
+    case Some(T)
+}
+
+extension PacketLexer {
+    private mutating func parseThreadReference() -> ValueParseResult<ThreadReference> {
+        if expectAndConsume("-") {
+            guard expectAndConsume("1") else {
+                return .None(.Invalid("Invalid thread number"))
+            }
+            return .Some(.All)
+        } else {
+            guard let threadID = expectAndConsumeHexBigEndianInteger() else {
+                return .None(.Invalid("Invalid thread number"))
+            }
+            return .Some(threadID == 0 ? .Any : .ID(threadID))
+        }
+    }
+}
+
 // H packets select the current thread.
 // -1: All, 0: Any, NNN: Thread ID.
 private func handleSetCurrentThread(inout server: DebugServerState, payload: String) -> ParseResult {
@@ -202,16 +224,11 @@ private func handleSetCurrentThread(inout server: DebugServerState, payload: Str
         return .Invalid("Missing type")
     }
     let thread: ThreadReference
-    if lexer.expectAndConsume("-") {
-        guard lexer.expectAndConsume("1") else {
-            return .Invalid("Invalid thread number")
-        }
-        thread = .All
-    } else {
-        guard let threadID = lexer.expectAndConsumeHexBigEndianInteger() else {
-            return .Invalid("Invalid thread number")
-        }
-        thread = threadID == 0 ? .Any : .ID(threadID)
+    switch lexer.parseThreadReference() {
+    case .Some(let t):
+        thread = t
+    case .None(let parseResult):
+        return parseResult
     }
     switch type {
     case "c":
@@ -238,6 +255,52 @@ private func handleVContQuery(inout server: DebugServerState, payload: String) -
     return .Response("vCont;c;s")
 }
 
+// vCont
+private func handleVCont(inout server: DebugServerState, payload: String) -> ParseResult {
+    if payload == "vCont;c" {
+        return handleContinue(&server, payload: "c")
+    } else if payload == "vCont;s" {
+        return handleStep(&server, payload: "s")
+    }
+    var parser = PacketLexer(payload: payload, offset: "vCont".characters.count)
+    var actions: [ThreadResumeEntry] = []
+    var defaultAction: ThreadResumeAction?
+    while parser.expectAndConsume(";") {
+        let action: ThreadResumeAction
+        switch parser.consumeCharacter() {
+        case "c"?:
+            action = .Continue
+        case "s"?:
+            action = .Step
+        default:
+            return .Invalid("Unsupported vCont action")
+        }
+        if parser.expectAndConsume(":") {
+            switch parser.parseThreadReference() {
+            case .Some(let thread):
+                actions.append(ThreadResumeEntry(thread: thread, action: action, address: .None))
+            case .None(let parseResult):
+                return parseResult
+            }
+        } else {
+            guard defaultAction == nil else {
+                return .Invalid("Default action is specified more than once")
+            }
+            defaultAction = action
+        }
+    }
+    guard defaultAction != nil || !actions.isEmpty else {
+        return .Invalid("No action specified")
+    }
+    do {
+        try server.debugger.resume(actions, defaultAction: defaultAction ?? .Stop)
+        // The response will be the stopped/exited message.
+        return .WaitForThreadEvent
+    } catch {
+        return .Error(.E25)
+    }
+}
+
 // c [addr]
 private func handleContinue(inout server: DebugServerState, payload: String) -> ParseResult {
     var parser = PacketLexer(payload: payload, offset: 1)
@@ -251,9 +314,9 @@ private func handleContinue(inout server: DebugServerState, payload: String) -> 
         address = nil
     }
     do {
-        try server.debugger.resume(server.continueThread, action: .Continue, defaultAction: .Continue, address: address)
+        try server.debugger.resume([ ThreadResumeEntry(thread: server.continueThread, action: .Continue, address: address) ], defaultAction: .Continue)
         // Don't send an OK as the response is the stopped/exited message.
-        return .NoReply
+        return .WaitForThreadEvent
     } catch {
         return .Error(.E25)
     }
@@ -273,9 +336,9 @@ private func handleStep(inout server: DebugServerState, payload: String) -> Pars
     }
     do {
         // Make all other threads stop when we are stepping.
-        try server.debugger.resume(.ID(server.continueThreadID), action: .Step, defaultAction: .Stop, address: address)
+        try server.debugger.resume([ ThreadResumeEntry(thread: .ID(server.continueThreadID), action: .Step, address: address) ], defaultAction: .Stop)
         // Don't send an OK as the response is the stopped/exited message.
-        return .NoReply
+        return .WaitForThreadEvent
     } catch {
         return .Error(.E49)
     }
@@ -434,6 +497,7 @@ class DebugServer {
             ("z0", handleZ),
             ("Z0", handleZ),
             ("vCont?", handleVContQuery),
+            ("vCont", handleVCont),
             ("H", handleSetCurrentThread),
             ("qC", handleCurrentThreadQuery),
             ("_M", handleAllocate),
@@ -469,6 +533,8 @@ class DebugServer {
             send("OK")
         case .Response(let r):
             send(r)
+        case .WaitForThreadEvent:
+            break
         case .Unimplemented:
             send("")
         case .Invalid:

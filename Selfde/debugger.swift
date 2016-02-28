@@ -24,9 +24,16 @@ enum ThreadReference {
 }
 
 enum ThreadResumeAction: Int {
+    case None
     case Stop
     case Continue
     case Step
+}
+
+struct ThreadResumeEntry {
+    let thread: ThreadReference
+    let action: ThreadResumeAction
+    let address: COpaquePointer?
 }
 
 protocol Debugger: class {
@@ -37,7 +44,7 @@ protocol Debugger: class {
     func killInferior() throws
     func getSharedLibraryInfoAddress() throws -> COpaquePointer
 
-    func resume(thread: ThreadReference, action: ThreadResumeAction, defaultAction: ThreadResumeAction, address: COpaquePointer?) throws
+    func resume(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction) throws
 
     // TODO: ref count up
     func setBreakpoint(address: COpaquePointer, byteSize: Int) throws

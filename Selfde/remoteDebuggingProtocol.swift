@@ -139,7 +139,7 @@ struct PacketLexer {
     }
     
     mutating func expectAndConsume(c: UnicodeScalar) -> Bool {
-        guard payload[index] == c else {
+        guard index < endIndex && payload[index] == c else {
             return false
         }
         index = index.successor()

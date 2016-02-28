@@ -103,7 +103,7 @@ class SelfdeTests: XCTestCase {
         enum MockError: ErrorType { case NotExpected }
         
         final class MockDebugger: Debugger {
-            var expectedResumes: [(ThreadReference, ThreadResumeAction, ThreadResumeAction, COpaquePointer?)]
+            var expectedResumes: [([ThreadResumeEntry], ThreadResumeAction)]
             var expectedSetBreakpoints: [(UInt, Int)] = []
             var removeBreakpoint: [UInt] = []
             var expectedAllocates: [(Int, MemoryPermissions)]
@@ -115,7 +115,7 @@ class SelfdeTests: XCTestCase {
             var expectedRegisterContextReads: [(UInt, [UInt8])]
             var expectedRegisterContextWrites: [(UInt, [UInt8])]
             
-            init(expectedResumes: [(ThreadReference, ThreadResumeAction, ThreadResumeAction, COpaquePointer?)] = [], expectedSetBreakpoints: [(UInt, Int)] = [], expectedAllocates: [(Int, MemoryPermissions)] = [], expectedDeallocates: [COpaquePointer] = [], expectedMemoryReads: [(UInt, Int)] = [], expectedMemoryWrites: [(UInt, [UInt8])] = [], expectedRegisterReads: [(UInt, UInt32, UInt32, UInt64)] = [], expectedRegisterWrites: [(UInt, UInt32, UInt32, UInt64)] = [], expectedRegisterContextReads: [(UInt, [UInt8])] = [], expectedRegisterContextWrites: [(UInt, [UInt8])] = []) {
+            init(expectedResumes: [([ThreadResumeEntry], ThreadResumeAction)] = [], expectedSetBreakpoints: [(UInt, Int)] = [], expectedAllocates: [(Int, MemoryPermissions)] = [], expectedDeallocates: [COpaquePointer] = [], expectedMemoryReads: [(UInt, Int)] = [], expectedMemoryWrites: [(UInt, [UInt8])] = [], expectedRegisterReads: [(UInt, UInt32, UInt32, UInt64)] = [], expectedRegisterWrites: [(UInt, UInt32, UInt32, UInt64)] = [], expectedRegisterContextReads: [(UInt, [UInt8])] = [], expectedRegisterContextWrites: [(UInt, [UInt8])] = []) {
                 self.expectedResumes = expectedResumes
                 self.expectedSetBreakpoints = expectedSetBreakpoints
                 self.expectedAllocates = expectedAllocates
@@ -132,15 +132,12 @@ class SelfdeTests: XCTestCase {
                 return 12
             }
 
-            func resume(thread: ThreadReference, action: ThreadResumeAction, defaultAction: ThreadResumeAction, address: COpaquePointer?) throws {
+            func resume(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction) throws {
                 guard let value = expectedResumes.first else {
                     throw MockError.NotExpected
                 }
                 expectedResumes.removeFirst()
-                XCTAssertEqual(value.0, thread)
-                XCTAssertEqual(value.1, action)
-                XCTAssertEqual(value.2, defaultAction)
-                XCTAssertEqual(value.3, address)
+                XCTAssert(value.0 == actions)
             }
 
             func setBreakpoint(address: COpaquePointer, byteSize: Int) throws {
@@ -276,7 +273,22 @@ class SelfdeTests: XCTestCase {
             return result
         }
 
-        let server = DebugServer(debugger: MockDebugger(expectedResumes: [(.All, .Continue, .Continue, nil), (.All, .Continue, .Continue, COpaquePointer(bitPattern: 0)), (.All, .Continue, .Continue, COpaquePointer(bitPattern: 0x4000)), (.ID(0x40), .Continue, .Continue, nil), (.ID(0x40), .Step, .Stop, nil), (.ID(0x40), .Step, .Stop, COpaquePointer(bitPattern: 0x123456789ab)), (.ID(0xc), .Step, .Stop, nil), (.ID(0xC), .Step, .Stop, nil)], expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]))
+        let server = DebugServer(debugger: MockDebugger(expectedResumes: [
+            ([ThreadResumeEntry(thread: .All, action: .Continue, address: nil)], .Continue),
+            ([ThreadResumeEntry(thread: .All, action: .Continue, address: COpaquePointer(bitPattern: 0))], .Continue),
+            ([ThreadResumeEntry(thread: .All, action: .Continue, address: COpaquePointer(bitPattern: 0x4000))], .Continue),
+            ([ThreadResumeEntry(thread: .ID(0x40), action: .Continue, address: nil)], .Continue),
+            ([ThreadResumeEntry(thread: .ID(0x40), action: .Step, address: nil)], .Stop),
+            ([ThreadResumeEntry(thread: .ID(0x40), action: .Step, address: COpaquePointer(bitPattern: 0x123456789ab))], .Stop),
+            ([ThreadResumeEntry(thread: .ID(0xc), action: .Step, address: nil)], .Stop),
+            ([ThreadResumeEntry(thread: .ID(0xC), action: .Step, address: nil)], .Stop),
+            ([ThreadResumeEntry(thread: .All, action: .Continue, address: nil)], .Continue),
+            ([ThreadResumeEntry(thread: .ID(0xC), action: .Step, address: nil)], .Stop),
+            ([ThreadResumeEntry(thread: .ID(0x404), action: .Continue, address: nil)], .Stop),
+            ([ThreadResumeEntry(thread: .ID(0x20), action: .Step, address: nil)], .Stop),
+            ([ThreadResumeEntry(thread: .ID(0x20), action: .Step, address: nil)], .Continue),
+            ([ThreadResumeEntry(thread: .ID(0x40), action: .Continue, address: nil)], .Step),
+            ], expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]))
 
         XCTAssertEqual(server.handlePacketPayload("foo"), ParseResult.Unimplemented)
         XCTAssertEqual(server.handlePacketPayload(""), ParseResult.Unimplemented)
@@ -369,18 +381,30 @@ class SelfdeTests: XCTestCase {
         XCTAssert(server.handlePacketPayload("Hc-2").isInvalid)
 
         // Continue/step
-        XCTAssertEqual(server.handlePacketPayload("c"), ParseResult.NoReply)
-        XCTAssertEqual(server.handlePacketPayload("c0"), ParseResult.NoReply)
-        XCTAssertEqual(server.handlePacketPayload("c4000"), ParseResult.NoReply)
+        XCTAssertEqual(server.handlePacketPayload("c"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("c0"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("c4000"), ParseResult.WaitForThreadEvent)
         XCTAssertEqual(server.handlePacketPayload("Hc40"), ParseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("c"), ParseResult.NoReply)
+        XCTAssertEqual(server.handlePacketPayload("c"), ParseResult.WaitForThreadEvent)
         XCTAssert(server.handlePacketPayload("c=").isInvalid)
-        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.NoReply)
-        XCTAssertEqual(server.handlePacketPayload("s123456789ab"), ParseResult.NoReply)
+        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("s123456789ab"), ParseResult.WaitForThreadEvent)
         XCTAssertEqual(server.handlePacketPayload("Hc0"), ParseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.NoReply)
+        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadEvent)
         XCTAssertEqual(server.handlePacketPayload("Hc-1"), ParseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.NoReply)
+        XCTAssertEqual(server.handlePacketPayload("s"), ParseResult.WaitForThreadEvent)
+        // vCont as well..
+        XCTAssertEqual(server.handlePacketPayload("vCont;c"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("vCont;c:404"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s:20"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("vCont;c;s:20"), ParseResult.WaitForThreadEvent)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s;c:40"), ParseResult.WaitForThreadEvent)
+        XCTAssert(server.handlePacketPayload("vCont").isInvalid)
+        XCTAssert(server.handlePacketPayload("vCont;").isInvalid)
+        XCTAssert(server.handlePacketPayload("vCont;a").isInvalid)
+        XCTAssert(server.handlePacketPayload("vCont;c:").isInvalid)
+
 
         // Stop info
 
@@ -408,6 +432,12 @@ func == (lhs: ThreadReference, rhs: ThreadReference) -> Bool {
     }
 }
 
+extension ThreadResumeEntry: Equatable { }
+
+func == (lhs: ThreadResumeEntry, rhs: ThreadResumeEntry) -> Bool {
+    return lhs.thread == rhs.thread && lhs.action == rhs.action && lhs.address == rhs.address
+}
+
 extension PacketPayloadResult: Equatable { }
 
 func == (lhs: PacketPayloadResult, rhs: PacketPayloadResult) -> Bool {
@@ -425,7 +455,7 @@ extension ParseResult: Equatable { }
 
 func == (lhs: ParseResult, rhs: ParseResult) -> Bool {
     switch (lhs, rhs) {
-    case (.NoReply, .NoReply), (.OK, .OK), (.Unimplemented, .Unimplemented), (.Invalid, .Invalid), (.Error, .Error):
+    case (.NoReply, .NoReply), (.OK, .OK), (.Unimplemented, .Unimplemented), (.Invalid, .Invalid), (.Error, .Error), (.WaitForThreadEvent, .WaitForThreadEvent):
         return true
     case (.Response(let x), .Response(let y)):
         return x == y
