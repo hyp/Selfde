@@ -18,6 +18,7 @@ enum ErrorResultKind {
     case E53
     case E54
     case E55
+    case E68
     case E74
 }
 
@@ -35,6 +36,7 @@ enum ParseResult {
 struct DebugServerState {
     let debugger: Debugger
     var registerState: DebuggerRegisterState
+    private var processID: Int?
 
     private var continueThread = ThreadReference.All
     private var currentThread = ThreadReference.All
@@ -425,34 +427,93 @@ private func handleQThreadSuffixSupported(inout server: DebugServerState, payloa
 
 // Returns host information.
 private func handleQHostInfo(inout server: DebugServerState, payload: String) -> ParseResult {
-    var result = ""
-    if let (CPUType, CPUSubType) = getCPUType() {
-        result.write("cputype:\(CPUType);cpusubtype:\(CPUSubType);")
-    }
-    #if os(OSX)
-        result.write("ostype:macosx;watchpoint_exceptions_received:after;")
-        result.write("vendor:apple;")
-    #endif
-    result.write("endian:little;") // FIXME: what about big?
-    result.write("ptrsize:\(sizeof(COpaquePointer));")
-    return .Response(result)
+    return .Response(getHostProcessInfo())
 }
 
-func getCPUType() -> (Int, Int)? {
+private func getHostProcessInfo(isHostInfo isHostInfo: Bool = true) -> String {
+    var result = ""
+    if let (CPUType, CPUSubType) = getCPUType(isHostInfo: isHostInfo) {
+        if isHostInfo {
+            result.write("cputype:\(CPUType);cpusubtype:\(CPUSubType);")
+        } else {
+            result.write("cputype:\(String(CPUType, radix: 16, uppercase: false));cpusubtype:\(String(CPUSubType, radix: 16, uppercase: false));")
+        }
+    }
+    #if os(OSX)
+        result.write("ostype:macosx;")
+        if isHostInfo {
+            result.write("watchpoint_exceptions_received:after;")
+        }
+        result.write("vendor:apple;")
+    #endif
+    result.write("endian:little;") // FIXME: Any big endian targets?
+    if isHostInfo {
+        result.write("ptrsize:\(sizeof(COpaquePointer));")
+    } else {
+        result.write("ptrsize:\(String(sizeof(COpaquePointer), radix: 16, uppercase: false))")
+    }
+    return result
+}
+
+private func getCPUType(isHostInfo isHostInfo: Bool) -> (Int, Int)? {
     var type: UInt32 = 0
     var subtype: UInt32 = 0
+    var is64BitCapable: UInt32 = 0
     var err: Int32 = withUnsafeMutablePointer(&type) {
         var size = sizeofValue(type)
         return sysctlbyname("hw.cputype", $0, &size, nil, 0)
     }
     err |= withUnsafeMutablePointer(&subtype) {
-        var size = sizeofValue(type)
+        var size = sizeofValue(subtype)
         return sysctlbyname("hw.cpusubtype", $0, &size, nil, 0)
     }
-    #if arch(x86_64) || arch(arm64)
-        type |= UInt32(CPU_ARCH_ABI64)
-    #endif
+    if isHostInfo {
+        // Host info decides on the 64 bit based on the hardware capability.
+        err |= withUnsafeMutablePointer(&is64BitCapable) {
+            var size = sizeofValue(is64BitCapable)
+            return sysctlbyname("hw.cpu64bit_capable", $0, &size, nil, 0)
+        }
+        if is64BitCapable != 0 {
+            type |= UInt32(CPU_ARCH_ABI64)
+        }
+    } else {
+        // Process info decides on the 64 bit based on the target architecture, since we're debugging self.
+        #if arch(x86_64) || arch(arm64)
+            type |= UInt32(CPU_ARCH_ABI64)
+        #endif
+    }
     return err == 0 ? (Int(type), Int(subtype)) : nil
+}
+
+// Returns process information.
+private func handleQProcessInfo(inout server: DebugServerState, payload: String) -> ParseResult {
+    var result = ""
+    guard let processID = server.processID else {
+        return .Error(.E68)
+    }
+    result += "pid:\(String(processID, radix: 16, uppercase: false));"
+
+    var processInfoRequest = [CTL_KERN, KERN_PROC, KERN_PROC_PID, Int32(processID)]
+    var processInfo = kinfo_proc()
+    var processInfoSize = sizeofValue(processInfo)
+    if processInfoRequest.withUnsafeMutableBufferPointer({ (inout requestPtr: UnsafeMutableBufferPointer<Int32>) in
+        withUnsafeMutablePointer(&processInfo) { infoPtr in
+            sysctl(requestPtr.baseAddress, 4, infoPtr, &processInfoSize, nil, 0)
+        }
+    }) == 0 && processInfoSize > 0 {
+        func hex(i: UInt32) -> String {
+            return String(Int(i), radix: 16, uppercase: false)
+        }
+        result += "parent-pid:\(String(Int(processInfo.kp_eproc.e_ppid), radix: 16, uppercase: false));"
+        result += "real-uid:\(hex(processInfo.kp_eproc.e_pcred.p_ruid));"
+        result += "real-gid:\(hex(processInfo.kp_eproc.e_pcred.p_rgid));"
+        result += "effective-uid:\(hex(processInfo.kp_eproc.e_ucred.cr_uid));"
+        if processInfo.kp_eproc.e_ucred.cr_ngroups > 0 {
+            result += "effective-gid:\(hex(processInfo.kp_eproc.e_ucred.cr_groups.0));"
+        }
+    }
+    result += getHostProcessInfo(isHostInfo: false)
+    return .Response(result)
 }
 
 private func handleQStartNoAckMode(inout server: DebugServerState, payload: String) -> ParseResult {
@@ -475,6 +536,7 @@ private func handleVAttach(inout server: DebugServerState, payload: String) -> P
         return .Invalid("No PID given")
     }
     do {
+        server.processID = Int(processID)
         try server.debugger.attach(Int(processID))
         // Send a stop reply packet.
         return .ThreadStopReply
@@ -517,6 +579,7 @@ class DebugServer {
             ("qSymbol:", handleQSymbol),
             ("qSupported", handleQSupported),
             ("qHostInfo", handleQHostInfo),
+            ("qProcessInfo", handleQProcessInfo),
             ("QThreadSuffixSupported", handleQThreadSuffixSupported),
             ("QStartNoAckMode", handleQStartNoAckMode),
             ("qEcho:", handleQEcho),

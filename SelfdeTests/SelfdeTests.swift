@@ -419,10 +419,32 @@ class SelfdeTests: XCTestCase {
         XCTAssertEqual(server.handlePacketPayload("qShlibInfoAddr"), ParseResult.Response("1013"))
         XCTAssertEqual(server.handlePacketPayload("qSymbol::"), ParseResult.OK)
         XCTAssertEqual(server.handlePacketPayload("qSymbol:64697370617463685f71756575655f6f666673657473"), ParseResult.OK)
-        server.handlePacketPayload("qHostInfo")
         server.handlePacketPayload("qSupported")
         server.handlePacketPayload("qSupported:xmlRegisters=arm")
         // TODO: qXfer:features:read
+        switch server.handlePacketPayload("qHostInfo") {
+        case .Response(let response):
+            XCTAssertNotNil(response.rangeOfString("cputype:"))
+            XCTAssertNotNil(response.rangeOfString("cpusubtype:"))
+            XCTAssertNotNil(response.rangeOfString("ostype:"))
+            XCTAssertNotNil(response.rangeOfString("endian:"))
+            XCTAssertNotNil(response.rangeOfString("ptrsize:"))
+            break
+        default:
+            XCTFail()
+        }
+        switch server.handlePacketPayload("qProcessInfo") {
+        case .Response(let response):
+            XCTAssertNotNil(response.rangeOfString("pid:12345"))
+            XCTAssertNotNil(response.rangeOfString("cputype:"))
+            XCTAssertNotNil(response.rangeOfString("cpusubtype:"))
+            XCTAssertNotNil(response.rangeOfString("ostype:"))
+            XCTAssertNotNil(response.rangeOfString("endian:"))
+            XCTAssertNotNil(response.rangeOfString("ptrsize:"))
+            break
+        default:
+            XCTFail()
+        }
     }
 }
 
