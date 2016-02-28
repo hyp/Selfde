@@ -23,8 +23,8 @@ enum ErrorResultKind {
     case E74
 }
 
-enum ParseResult {
-    case NoReply
+enum ResponseResult {
+    case None
     case OK
     case Response(String)
     case WaitForThreadStopReply
@@ -91,22 +91,22 @@ extension DebugServerState {
 }
 
 // packet '?'
-private func handleHaltReasonQuery(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleHaltReasonQuery(inout server: DebugServerState, payload: String) -> ResponseResult {
     return .ThreadStopReply
 }
 
-private func handleK(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleK(inout server: DebugServerState, payload: String) -> ResponseResult {
     do {
         try server.debugger.killInferior()
         // Exit with code 9 (KILL).
         return .Response("X09")
     } catch {
     }
-    return .NoReply
+    return .None
 }
 
 // m packets read memory.
-private func handleMemoryRead(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleMemoryRead(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let address = parser.expectAndConsumeHexBigEndianAddress() else {
         return .Invalid("Missing address")
@@ -131,7 +131,7 @@ private func handleMemoryRead(inout server: DebugServerState, payload: String) -
 }
 
 // M packets write memory.
-private func handleMemoryWrite(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleMemoryWrite(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let address = parser.expectAndConsumeHexBigEndianAddress() else {
         return .Invalid("Missing address")
@@ -163,7 +163,7 @@ private func handleMemoryWrite(inout server: DebugServerState, payload: String) 
 }
 
 // _M packets allocate memory with permissions (useful for JIT).
-private func handleAllocate(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleAllocate(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 2)
     guard let size = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("Missing size")
@@ -193,7 +193,7 @@ private func handleAllocate(inout server: DebugServerState, payload: String) -> 
 }
 
 // _m packets deallocate memory that was allocated using _M.
-private func handleDeallocate(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleDeallocate(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 2)
     guard let address: COpaquePointer = parser.expectAndConsumeHexBigEndianAddress() else {
         return .Error(.E54)
@@ -206,13 +206,13 @@ private func handleDeallocate(inout server: DebugServerState, payload: String) -
     }
 }
 
-private enum ValueParseResult<T> {
-    case None(ParseResult)
+private enum ValueResponseResult<T> {
+    case None(ResponseResult)
     case Some(T)
 }
 
 extension PacketParser {
-    private mutating func parseThreadReference() -> ValueParseResult<ThreadReference> {
+    private mutating func parseThreadReference() -> ValueResponseResult<ThreadReference> {
         if expectAndConsume("-") {
             guard expectAndConsume("1") else {
                 return .None(.Invalid("Invalid thread number"))
@@ -229,7 +229,7 @@ extension PacketParser {
 
 // H packets select the current thread.
 // -1: All, 0: Any, NNN: Thread ID.
-private func handleSetCurrentThread(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleSetCurrentThread(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let type = parser.consumeCharacter() where type == "c" || type == "g" else {
         return .Invalid("Missing type")
@@ -253,7 +253,7 @@ private func handleSetCurrentThread(inout server: DebugServerState, payload: Str
 }
 
 // Return the current thread ID for qC packets.
-private func handleCurrentThreadQuery(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleCurrentThreadQuery(inout server: DebugServerState, payload: String) -> ResponseResult {
     let threadID = server.currentThreadID
     // Set the current thread as well to override the .Any and .All states.
     server.currentThread = .ID(threadID)
@@ -261,7 +261,7 @@ private func handleCurrentThreadQuery(inout server: DebugServerState, payload: S
 }
 
 // qThreadStopInfo - info about a thread stop.
-private func handleQThreadStopInfo(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleQThreadStopInfo(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "qThreadStopInfo".characters.count)
     guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("No thread id given")
@@ -270,13 +270,13 @@ private func handleQThreadStopInfo(inout server: DebugServerState, payload: Stri
 }
 
 // vCont?
-private func handleVContQuery(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleVContQuery(inout server: DebugServerState, payload: String) -> ResponseResult {
     // Support 'c' (continue) and 's' (step)
     return .Response("vCont;c;s")
 }
 
 // vCont
-private func handleVCont(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleVCont(inout server: DebugServerState, payload: String) -> ResponseResult {
     if payload == "vCont;c" {
         return handleContinue(&server, payload: "c")
     } else if payload == "vCont;s" {
@@ -322,7 +322,7 @@ private func handleVCont(inout server: DebugServerState, payload: String) -> Par
 }
 
 // c [addr]
-private func handleContinue(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleContinue(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     let address: COpaquePointer?
     if parser.hasContents {
@@ -343,7 +343,7 @@ private func handleContinue(inout server: DebugServerState, payload: String) -> 
 }
 
 // s [addr]
-private func handleStep(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleStep(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     let address: COpaquePointer?
     if parser.hasContents {
@@ -365,7 +365,7 @@ private func handleStep(inout server: DebugServerState, payload: String) -> Pars
 }
 
 // z/Z packets control the breakpoints/watchpoints.
-private func handleZ(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleZ(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload)
     guard let command = parser.consumeCharacter(),
         breakpointType = parser.consumeCharacter() else {
@@ -410,7 +410,7 @@ private func handleZ(inout server: DebugServerState, payload: String) -> ParseRe
     return .Unimplemented
 }
 
-private func handleQShlibInfoAddr(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleQShlibInfoAddr(inout server: DebugServerState, payload: String) -> ResponseResult {
     do {
         let address = try server.debugger.getSharedLibraryInfoAddress()
         return .Response(address.bigEndianHexString)
@@ -419,30 +419,30 @@ private func handleQShlibInfoAddr(inout server: DebugServerState, payload: Strin
     }
 }
 
-private func handleQSymbol(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleQSymbol(inout server: DebugServerState, payload: String) -> ResponseResult {
     // Don't need any symbol lookups.
     return .OK
 }
 
-private func handleQSupported(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleQSupported(inout server: DebugServerState, payload: String) -> ResponseResult {
     // Don't care about the payload here.
     return .Response("PacketSize=20000;qEcho+")
 }
 
 // This will enabled thread suffix for the 'g', 'G', 'p', and 'P' commands.
-private func handleQThreadSuffixSupported(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleQThreadSuffixSupported(inout server: DebugServerState, payload: String) -> ResponseResult {
     server.threadSuffixSupported = true
     return .OK
 }
 
 // This will enable thread information in the stop reply packet.s
-func handleQListThreadsInStopReply(inout server: DebugServerState, payload: String) -> ParseResult {
+func handleQListThreadsInStopReply(inout server: DebugServerState, payload: String) -> ResponseResult {
     server.listThreadsInStopReply = true
     return .OK
 }
 
 // Returns host information.
-private func handleQHostInfo(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleQHostInfo(inout server: DebugServerState, payload: String) -> ResponseResult {
     return .Response(getHostProcessInfo())
 }
 
@@ -502,7 +502,7 @@ private func getCPUType(isHostInfo isHostInfo: Bool) -> (Int, Int)? {
 }
 
 // Returns process information.
-private func handleQProcessInfo(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleQProcessInfo(inout server: DebugServerState, payload: String) -> ResponseResult {
     var result = ""
     guard let processID = server.processID else {
         return .Error(.E68)
@@ -532,14 +532,14 @@ private func handleQProcessInfo(inout server: DebugServerState, payload: String)
     return .Response(result)
 }
 
-private func handleQEcho(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleQEcho(inout server: DebugServerState, payload: String) -> ResponseResult {
     // Send back the payload.
     return .Response(payload)
 }
 
 // vAttach
 // Note: vAttachOrWait, vAttachName, vAttachWait aren't supported.
-private func handleVAttach(inout server: DebugServerState, payload: String) -> ParseResult {
+private func handleVAttach(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "vAttach;".characters.count)
     guard let processID = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("No PID given")
@@ -560,7 +560,7 @@ private func handleVAttach(inout server: DebugServerState, payload: String) -> P
 // LLDB extensions reference: [[TODO]]
 class DebugServer {
     private var state: DebugServerState
-    private var handlers: [(String, (inout DebugServerState, String) -> ParseResult)]
+    private var handlers: [(String, (inout DebugServerState, String) -> ResponseResult)]
 
     init(debugger: Debugger) {
         state = DebugServerState(debugger: debugger)
@@ -597,14 +597,14 @@ class DebugServer {
                 // Send OK before changing the flag.
                 self.sendResponse(.OK)
                 server.noAckMode = true
-                return .NoReply
+                return .None
             }),
             ("qEcho:", handleQEcho),
             ("k", handleK)
         ]
     }
 
-    func handlePacketPayload(payload: String) -> ParseResult {
+    func handlePacketPayload(payload: String) -> ResponseResult {
         for handler in handlers {
             if payload.hasPrefix(handler.0) {
                 return handler.1(&state, payload)
@@ -613,7 +613,7 @@ class DebugServer {
         return .Unimplemented
     }
 
-    private func handleStopReplyForThread(threadID: ThreadID) -> ParseResult {
+    private func handleStopReplyForThread(threadID: ThreadID) -> ResponseResult {
         let info: ThreadStopInfo
         do {
             info = try state.debugger.getStopInfoForThread(threadID)
@@ -667,7 +667,7 @@ class DebugServer {
         return .Response(result)
     }
 
-    func handleStopReply(result: ParseResult) -> ParseResult {
+    func handleStopReply(result: ResponseResult) -> ResponseResult {
         switch result {
         case .ThreadStopReply, .WaitForThreadStopReply:
             let threadID = state.debugger.primaryThreadID
@@ -677,15 +677,15 @@ class DebugServer {
             return handleStopReplyForThread(threadID)
         default:
             assertionFailure("Invalid stop reply")
-            return .NoReply
+            return .None
         }
     }
 
-    func sendResponse(result: ParseResult) {
+    func sendResponse(result: ResponseResult) {
         func send(s: String) {
         }
         switch result {
-        case .NoReply:
+        case .None:
             break
         case .OK:
             send("OK")

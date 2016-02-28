@@ -127,7 +127,7 @@ struct DebuggerRegisterState {
 }
 
 // qRegisterInfo can be used to query the register set.
-func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> ParseResult {
+func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "qRegisterInfo".characters.count)
     guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
@@ -227,7 +227,7 @@ func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> Par
 }
 
 // p register
-func handleRegisterRead(inout server: DebugServerState, payload: String) -> ParseResult {
+func handleRegisterRead(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
@@ -254,7 +254,7 @@ func handleRegisterRead(inout server: DebugServerState, payload: String) -> Pars
 }
 
 // P register = value
-func handleRegisterWrite(inout server: DebugServerState, payload: String) -> ParseResult {
+func handleRegisterWrite(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
@@ -285,7 +285,7 @@ func handleRegisterWrite(inout server: DebugServerState, payload: String) -> Par
 }
 
 // g
-func handleGPRegistersRead(inout server: DebugServerState, payload: String) -> ParseResult {
+func handleGPRegistersRead(inout server: DebugServerState, payload: String) -> ResponseResult {
     guard let threadID = server.extractThreadID(payload) else {
         return .Invalid("No thread specified")
     }
@@ -299,7 +299,7 @@ func handleGPRegistersRead(inout server: DebugServerState, payload: String) -> P
 }
 
 // G context-value
-func handleGPRegistersWrite(inout server: DebugServerState, payload: String) -> ParseResult {
+func handleGPRegistersWrite(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let value = parser.readHexBytes(server.debugger.registerContextSize) else {
         return .Invalid("Invalid register context value")
