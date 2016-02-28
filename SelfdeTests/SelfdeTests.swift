@@ -414,6 +414,7 @@ class SelfdeTests: XCTestCase {
         XCTAssert(server.handlePacketPayload("vAttach;").isInvalid)
 
         // Stop info
+        XCTAssertEqual(server.handlePacketPayload("QListThreadsInStopReply"), ParseResult.OK)
 
         // Queries
         XCTAssertEqual(server.handlePacketPayload("qShlibInfoAddr"), ParseResult.Response("1013"))

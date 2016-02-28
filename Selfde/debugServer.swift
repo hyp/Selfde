@@ -425,6 +425,12 @@ private func handleQThreadSuffixSupported(inout server: DebugServerState, payloa
     return .OK
 }
 
+// This will enable thread information in the stop reply packet.s
+func handleQListThreadsInStopReply(inout server: DebugServerState, payload: String) -> ParseResult {
+    server.listThreadsInStopReply = true
+    return .OK
+}
+
 // Returns host information.
 private func handleQHostInfo(inout server: DebugServerState, payload: String) -> ParseResult {
     return .Response(getHostProcessInfo())
@@ -574,6 +580,7 @@ class DebugServer {
             ("qHostInfo", handleQHostInfo),
             ("qProcessInfo", handleQProcessInfo),
             ("QThreadSuffixSupported", handleQThreadSuffixSupported),
+            ("QListThreadsInStopReply", handleQListThreadsInStopReply),
             ("QStartNoAckMode", { [unowned self] server, payload in
                 // Send OK before changing the flag.
                 self.sendResponse(.OK)
@@ -626,22 +633,4 @@ class DebugServer {
         print("$\(payload)#TODO")
         // TODO:
     }
-}
-
-// If this packet is received, it allows us to send an extra key/value
-// pair in the stop reply packets where we will list all of the thread IDs
-// separated by commas:
-//
-//  "threads:10a,10b,10c;"
-//
-// This will get included in the stop reply packet as something like:
-//
-//  "T11thread:10a;00:00000000;01:00010203:threads:10a,10b,10c;"
-//
-// This can save two packets on each stop: qfThreadInfo/qsThreadInfo and
-// speed things up a bit.
-//
-// Send the OK packet first so the correct checksum is appended...
-func handleQListThreadsInStopReply() {
-    //listThreadsInStopReply = true
 }
