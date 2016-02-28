@@ -55,12 +55,11 @@ enum PacketPayloadResult {
     case InvalidPacket
 }
 
-func parsePacketPayload(data: ArraySlice<UInt8>) -> PacketPayloadResult {
+func parsePacketPayload(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> PacketPayloadResult {
     guard let first = data.first else {
         // Empty packet, ignore.
         return .NoPacket
     }
-    let checkChecksums = true//!noAckModetrue
     switch first {
     case UInt8(ascii: "$"):
         let info = data.dropFirst(1)
