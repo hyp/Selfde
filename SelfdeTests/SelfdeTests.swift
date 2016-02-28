@@ -449,6 +449,7 @@ class SelfdeTests: XCTestCase {
         default:
             XCTFail()
         }
+        XCTAssertEqual(server.handlePacketPayload("?"), ParseResult.ThreadStopReply)
     }
 }
 

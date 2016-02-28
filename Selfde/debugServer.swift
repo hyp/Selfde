@@ -89,6 +89,11 @@ extension DebugServerState {
     }
 }
 
+// packet '?'
+private func handleHaltReasonQuery(inout server: DebugServerState, payload: String) -> ParseResult {
+    return .ThreadStopReply
+}
+
 private func handleK(inout server: DebugServerState, payload: String) -> ParseResult {
     do {
         try server.debugger.killInferior()
@@ -566,6 +571,7 @@ class DebugServer {
         state = DebugServerState(debugger: debugger)
         handlers = []
         handlers = [
+            ("?", handleHaltReasonQuery),
             ("m", handleMemoryRead),
             ("M", handleMemoryWrite),
             ("p", handleRegisterRead),
