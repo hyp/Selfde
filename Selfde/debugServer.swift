@@ -28,6 +28,7 @@ enum ParseResult {
     case Response(String)
     case WaitForThreadStopReply
     case ThreadStopReply
+    case StopReplyForThread(UInt)
     case Unimplemented
     case Invalid(String)
     case Error(ErrorResultKind)
@@ -251,6 +252,15 @@ private func handleCurrentThreadQuery(inout server: DebugServerState, payload: S
     // Set the current thread as well to override the .Any and .All states.
     server.currentThread = .ID(threadID)
     return .Response("QC\(String(threadID, radix: 16, uppercase: false))")
+}
+
+// qThreadStopInfo - info about a thread stop.
+private func handleQThreadStopInfo(inout server: DebugServerState, payload: String) -> ParseResult {
+    var parser = PacketLexer(payload: payload, offset: "qThreadStopInfo".characters.count)
+    guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
+        return .Invalid("No thread id given")
+    }
+    return .StopReplyForThread(threadID)
 }
 
 // vCont?
@@ -573,6 +583,7 @@ class DebugServer {
             ("qC", handleCurrentThreadQuery),
             ("_M", handleAllocate),
             ("_m", handleDeallocate),
+            ("qThreadStopInfo", handleQThreadStopInfo),
             ("qRegisterInfo", handleQRegisterInfo),
             ("qShlibInfoAddr", handleQShlibInfoAddr),
             ("qSymbol:", handleQSymbol),
@@ -611,7 +622,7 @@ class DebugServer {
             send("OK")
         case .Response(let r):
             send(r)
-        case .WaitForThreadStopReply, .ThreadStopReply:
+        case .WaitForThreadStopReply, .ThreadStopReply, .StopReplyForThread:
             break
         case .Unimplemented:
             send("")
@@ -621,7 +632,7 @@ class DebugServer {
             send("\(kind)")
         }
     }
-    
+
     private func sendPacket(payload: String) {
         guard !state.noAckMode else {
             // Output $\(string)#00

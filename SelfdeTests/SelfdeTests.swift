@@ -415,6 +415,9 @@ class SelfdeTests: XCTestCase {
 
         // Stop info
         XCTAssertEqual(server.handlePacketPayload("QListThreadsInStopReply"), ParseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("qThreadStopInfo12"), ParseResult.StopReplyForThread(0x12))
+        XCTAssertEqual(server.handlePacketPayload("qThreadStopInfo0"), ParseResult.StopReplyForThread(0))
+        XCTAssert(server.handlePacketPayload("qThreadStopInfo").isInvalid)
 
         // Queries
         XCTAssertEqual(server.handlePacketPayload("qShlibInfoAddr"), ParseResult.Response("1013"))
@@ -487,6 +490,8 @@ func == (lhs: ParseResult, rhs: ParseResult) -> Bool {
     switch (lhs, rhs) {
     case (.NoReply, .NoReply), (.OK, .OK), (.Unimplemented, .Unimplemented), (.Invalid, .Invalid), (.Error, .Error), (.WaitForThreadStopReply, .WaitForThreadStopReply), (.ThreadStopReply, .ThreadStopReply):
         return true
+    case (.StopReplyForThread(let x), .StopReplyForThread(let y)):
+        return x == y
     case (.Response(let x), .Response(let y)):
         return x == y
     default:
