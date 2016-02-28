@@ -48,9 +48,10 @@ extension CollectionType where Self.Generator.Element == UInt8, Self.Index == In
 }
 
 enum PacketPayloadResult {
-    case NoPacket
+    case None
     case Payload(String)
-    case ControlPacket
+    case ACK
+    case NACK
     case InvalidChecksum
     case InvalidPacket
 }
@@ -69,18 +70,17 @@ extension CollectionType where Self.Generator.Element == UInt8 {
 func parsePacketPayload(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> PacketPayloadResult {
     guard let first = data.first else {
         // Empty packet, ignore.
-        return .NoPacket
+        return .None
     }
     switch first {
     case UInt8(ascii: "$"):
         let info = data.dropFirst(1)
-        // If
         guard info.count >= 3 else {
             return .InvalidPacket
         }
         let checksumInfo = info.suffix(3)
         let payload = info.dropLast(3)
-        
+
         // Extract the sent checksum.
         if checkChecksums {
             assert(checksumInfo.count == 3)
@@ -94,7 +94,7 @@ func parsePacketPayload(data: ArraySlice<UInt8>, checkChecksums: Bool = true) ->
                 return .InvalidChecksum
             }
         }
-        
+
         // Return the payload.
         var str = ""
         str.reserveCapacity(payload.count)
@@ -102,9 +102,10 @@ func parsePacketPayload(data: ArraySlice<UInt8>, checkChecksums: Bool = true) ->
             str.write(String(UnicodeScalar(byte)))
         }
         return .Payload(str)
-    case UInt8(ascii: "+"), UInt8(ascii: "-"):
-        // ACK, NACK
-        return .ControlPacket
+    case UInt8(ascii: "+"):
+        return .ACK
+    case UInt8(ascii: "-"):
+        return .NACK
     default:
         return .InvalidPacket
     }

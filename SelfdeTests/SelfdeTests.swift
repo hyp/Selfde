@@ -86,15 +86,15 @@ class SelfdeTests: XCTestCase {
             return parsePacketPayload(bytes[0..<bytes.count])
         }
 
-        XCTAssertEqual(parsePacket(""), PacketPayloadResult.NoPacket)
+        XCTAssertEqual(parsePacket(""), PacketPayloadResult.None)
         XCTAssertEqual(parsePacket("$QStartNoAckMode#b0"), PacketPayloadResult.Payload("QStartNoAckMode"))
         XCTAssertEqual(parsePacket("$qSupported:xmlRegisters=i386,arm,mips#12"), PacketPayloadResult.Payload("qSupported:xmlRegisters=i386,arm,mips"))
         XCTAssertEqual(parsePacket("$qHostInfo#9b"), PacketPayloadResult.Payload("qHostInfo"))
         XCTAssertEqual(parsePacket("$qHostInfo#9B"), PacketPayloadResult.Payload("qHostInfo"))
         XCTAssertEqual(parsePacket("$qHostInfo#00"), PacketPayloadResult.InvalidChecksum)
         XCTAssertEqual(parsePacket("$qHostInfo0"), PacketPayloadResult.InvalidPacket)
-        XCTAssertEqual(parsePacket("+"), PacketPayloadResult.ControlPacket)
-        XCTAssertEqual(parsePacket("-"), PacketPayloadResult.ControlPacket)
+        XCTAssertEqual(parsePacket("+"), PacketPayloadResult.ACK)
+        XCTAssertEqual(parsePacket("-"), PacketPayloadResult.NACK)
         XCTAssertEqual(parsePacket("ha"), PacketPayloadResult.InvalidPacket)
         XCTAssertEqual(parsePacket("$vAttach;d20c#2f"), PacketPayloadResult.Payload("vAttach;d20c"))
     }
@@ -531,7 +531,7 @@ func == (lhs: PacketPayloadResult, rhs: PacketPayloadResult) -> Bool {
     switch (lhs, rhs) {
     case (.Payload(let x), .Payload(let y)):
         return x == y
-    case (.NoPacket, .NoPacket), (.InvalidChecksum, .InvalidChecksum), (.ControlPacket, .ControlPacket), (.InvalidPacket, .InvalidPacket):
+    case (.None, .None), (.InvalidChecksum, .InvalidChecksum), (.ACK, .ACK), (.NACK, .NACK), (.InvalidPacket, .InvalidPacket):
         return true
     default:
         return false
