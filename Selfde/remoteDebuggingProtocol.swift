@@ -102,8 +102,8 @@ func parsePacketPayload(data: ArraySlice<UInt8>, checkChecksums: Bool = true) ->
             str.write(String(UnicodeScalar(byte)))
         }
         return .Payload(str)
-    case UInt8(ascii: "+"), UInt8(ascii: "-"), 0x03:
-        // ACK, NACK, ???
+    case UInt8(ascii: "+"), UInt8(ascii: "-"):
+        // ACK, NACK
         return .ControlPacket
     default:
         return .InvalidPacket
