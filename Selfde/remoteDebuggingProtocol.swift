@@ -105,7 +105,7 @@ func parsePacketPayload(data: ArraySlice<UInt8>) -> PacketPayloadResult {
 }
 
 // Parses the debugger packet payloads.
-struct PacketLexer {
+struct PacketParser {
     private let payloadString: String
     private let payload: String.UnicodeScalarView
     private var index: String.UnicodeScalarIndex

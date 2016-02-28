@@ -115,7 +115,7 @@ struct DebuggerRegisterState {
 
 // qRegisterInfo can be used to query the register set.
 func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> ParseResult {
-    var parser = PacketLexer(payload: payload, offset: "qRegisterInfo".characters.count)
+    var parser = PacketParser(payload: payload, offset: "qRegisterInfo".characters.count)
     guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
     }
@@ -215,7 +215,7 @@ func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> Par
 
 // p register
 func handleRegisterRead(inout server: DebugServerState, payload: String) -> ParseResult {
-    var parser = PacketLexer(payload: payload, offset: 1)
+    var parser = PacketParser(payload: payload, offset: 1)
     guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
     }
@@ -242,7 +242,7 @@ func handleRegisterRead(inout server: DebugServerState, payload: String) -> Pars
 
 // P register = value
 func handleRegisterWrite(inout server: DebugServerState, payload: String) -> ParseResult {
-    var parser = PacketLexer(payload: payload, offset: 1)
+    var parser = PacketParser(payload: payload, offset: 1)
     guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
     }
@@ -287,7 +287,7 @@ func handleGPRegistersRead(inout server: DebugServerState, payload: String) -> P
 
 // G context-value
 func handleGPRegistersWrite(inout server: DebugServerState, payload: String) -> ParseResult {
-    var parser = PacketLexer(payload: payload, offset: 1)
+    var parser = PacketParser(payload: payload, offset: 1)
     guard let value = parser.readHexBytes(server.debugger.registerContextSize) else {
         return .Invalid("Invalid register context value")
     }

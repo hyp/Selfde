@@ -81,7 +81,7 @@ extension DebugServerState {
         guard let range = payload.rangeOfString("thread:") else {
             return nil
         }
-        var parser = PacketLexer(payload: payload, offset: range.endIndex)
+        var parser = PacketParser(payload: payload, offset: range.endIndex)
         guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
             return nil
         }
@@ -106,14 +106,14 @@ private func handleK(inout server: DebugServerState, payload: String) -> ParseRe
 
 // m packets read memory.
 private func handleMemoryRead(inout server: DebugServerState, payload: String) -> ParseResult {
-    var lexer = PacketLexer(payload: payload, offset: 1)
-    guard let address = lexer.expectAndConsumeHexBigEndianAddress() else {
+    var parser = PacketParser(payload: payload, offset: 1)
+    guard let address = parser.expectAndConsumeHexBigEndianAddress() else {
         return .Invalid("Missing address")
     }
-    guard lexer.expectAndConsumeComma() else {
+    guard parser.expectAndConsumeComma() else {
         return .Invalid("Missing comma")
     }
-    guard let size = lexer.expectAndConsumeHexBigEndianInteger() else {
+    guard let size = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("Missing size")
     }
     guard size != 0 else {
@@ -131,23 +131,23 @@ private func handleMemoryRead(inout server: DebugServerState, payload: String) -
 
 // M packets write memory.
 private func handleMemoryWrite(inout server: DebugServerState, payload: String) -> ParseResult {
-    var lexer = PacketLexer(payload: payload, offset: 1)
-    guard let address = lexer.expectAndConsumeHexBigEndianAddress() else {
+    var parser = PacketParser(payload: payload, offset: 1)
+    guard let address = parser.expectAndConsumeHexBigEndianAddress() else {
         return .Invalid("Missing address")
     }
-    guard lexer.expectAndConsumeComma() else {
+    guard parser.expectAndConsumeComma() else {
         return .Invalid("Missing comma")
     }
-    guard let size = lexer.expectAndConsumeHexBigEndianInteger() else {
+    guard let size = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("Missing size")
     }
     guard size != 0 else {
         return .OK
     }
-    guard lexer.expectAndConsume(UnicodeScalar(":")) else {
+    guard parser.expectAndConsume(UnicodeScalar(":")) else {
         return .Invalid("Missing colon")
     }
-    guard let bytes = lexer.readHexBytes() else {
+    guard let bytes = parser.readHexBytes() else {
         return .Invalid("Invalid hex bytes")
     }
     guard bytes.count == Int(size) else {
@@ -163,15 +163,15 @@ private func handleMemoryWrite(inout server: DebugServerState, payload: String) 
 
 // _M packets allocate memory with permissions (useful for JIT).
 private func handleAllocate(inout server: DebugServerState, payload: String) -> ParseResult {
-    var lexer = PacketLexer(payload: payload, offset: 2)
-    guard let size = lexer.expectAndConsumeHexBigEndianInteger() else {
+    var parser = PacketParser(payload: payload, offset: 2)
+    guard let size = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("Missing size")
     }
-    guard lexer.expectAndConsumeComma() else {
+    guard parser.expectAndConsumeComma() else {
         return .Invalid("Missing comma")
     }
     var permissions: MemoryPermissions = []
-    while let a = lexer.consumeCharacter() {
+    while let a = parser.consumeCharacter() {
         switch a {
         case "r":
             permissions.insert(.Read)
@@ -193,8 +193,8 @@ private func handleAllocate(inout server: DebugServerState, payload: String) -> 
 
 // _m packets deallocate memory that was allocated using _M.
 private func handleDeallocate(inout server: DebugServerState, payload: String) -> ParseResult {
-    var lexer = PacketLexer(payload: payload, offset: 2)
-    guard let address: COpaquePointer = lexer.expectAndConsumeHexBigEndianAddress() else {
+    var parser = PacketParser(payload: payload, offset: 2)
+    guard let address: COpaquePointer = parser.expectAndConsumeHexBigEndianAddress() else {
         return .Error(.E54)
     }
     do {
@@ -210,7 +210,7 @@ private enum ValueParseResult<T> {
     case Some(T)
 }
 
-extension PacketLexer {
+extension PacketParser {
     private mutating func parseThreadReference() -> ValueParseResult<ThreadReference> {
         if expectAndConsume("-") {
             guard expectAndConsume("1") else {
@@ -229,12 +229,12 @@ extension PacketLexer {
 // H packets select the current thread.
 // -1: All, 0: Any, NNN: Thread ID.
 private func handleSetCurrentThread(inout server: DebugServerState, payload: String) -> ParseResult {
-    var lexer = PacketLexer(payload: payload, offset: 1)
-    guard let type = lexer.consumeCharacter() where type == "c" || type == "g" else {
+    var parser = PacketParser(payload: payload, offset: 1)
+    guard let type = parser.consumeCharacter() where type == "c" || type == "g" else {
         return .Invalid("Missing type")
     }
     let thread: ThreadReference
-    switch lexer.parseThreadReference() {
+    switch parser.parseThreadReference() {
     case .Some(let t):
         thread = t
     case .None(let parseResult):
@@ -261,7 +261,7 @@ private func handleCurrentThreadQuery(inout server: DebugServerState, payload: S
 
 // qThreadStopInfo - info about a thread stop.
 private func handleQThreadStopInfo(inout server: DebugServerState, payload: String) -> ParseResult {
-    var parser = PacketLexer(payload: payload, offset: "qThreadStopInfo".characters.count)
+    var parser = PacketParser(payload: payload, offset: "qThreadStopInfo".characters.count)
     guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("No thread id given")
     }
@@ -281,7 +281,7 @@ private func handleVCont(inout server: DebugServerState, payload: String) -> Par
     } else if payload == "vCont;s" {
         return handleStep(&server, payload: "s")
     }
-    var parser = PacketLexer(payload: payload, offset: "vCont".characters.count)
+    var parser = PacketParser(payload: payload, offset: "vCont".characters.count)
     var actions: [ThreadResumeEntry] = []
     var defaultAction: ThreadResumeAction?
     while parser.expectAndConsume(";") {
@@ -322,7 +322,7 @@ private func handleVCont(inout server: DebugServerState, payload: String) -> Par
 
 // c [addr]
 private func handleContinue(inout server: DebugServerState, payload: String) -> ParseResult {
-    var parser = PacketLexer(payload: payload, offset: 1)
+    var parser = PacketParser(payload: payload, offset: 1)
     let address: COpaquePointer?
     if parser.hasContents {
         guard let addr = parser.expectAndConsumeHexBigEndianAddress() else {
@@ -343,7 +343,7 @@ private func handleContinue(inout server: DebugServerState, payload: String) -> 
 
 // s [addr]
 private func handleStep(inout server: DebugServerState, payload: String) -> ParseResult {
-    var parser = PacketLexer(payload: payload, offset: 1)
+    var parser = PacketParser(payload: payload, offset: 1)
     let address: COpaquePointer?
     if parser.hasContents {
         guard let addr = parser.expectAndConsumeHexBigEndianAddress() else {
@@ -365,21 +365,21 @@ private func handleStep(inout server: DebugServerState, payload: String) -> Pars
 
 // z/Z packets control the breakpoints/watchpoints.
 private func handleZ(inout server: DebugServerState, payload: String) -> ParseResult {
-    var lexer = PacketLexer(payload: payload)
-    guard let command = lexer.consumeCharacter(),
-        breakpointType = lexer.consumeCharacter() else {
+    var parser = PacketParser(payload: payload)
+    guard let command = parser.consumeCharacter(),
+        breakpointType = parser.consumeCharacter() else {
             return .Invalid("")
     }
-    guard lexer.expectAndConsumeComma() else {
+    guard parser.expectAndConsumeComma() else {
         return .Invalid("Missing comma separator")
     }
-    guard let address = lexer.expectAndConsumeHexBigEndianAddress() else {
+    guard let address = parser.expectAndConsumeHexBigEndianAddress() else {
         return .Invalid("Invalid address")
     }
-    guard lexer.expectAndConsumeComma() else {
+    guard parser.expectAndConsumeComma() else {
         return .Invalid("Missing comma separator")
     }
-    guard let byteSize = lexer.expectAndConsumeHexBigEndianInteger() else {
+    guard let byteSize = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("Invalid byte size / kind")
     }
     
@@ -545,7 +545,7 @@ private func handleQEcho(inout server: DebugServerState, payload: String) -> Par
 // vAttach
 // Note: vAttachOrWait, vAttachName, vAttachWait aren't supported.
 private func handleVAttach(inout server: DebugServerState, payload: String) -> ParseResult {
-    var parser = PacketLexer(payload: payload, offset: "vAttach;".characters.count)
+    var parser = PacketParser(payload: payload, offset: "vAttach;".characters.count)
     guard let processID = parser.expectAndConsumeHexBigEndianInteger() else {
         return .Invalid("No PID given")
     }
