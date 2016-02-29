@@ -69,6 +69,8 @@ public protocol Thread {
 }
 
 public protocol Controller: class {
+    func getSharedLibraryInfoAddress() throws -> COpaquePointer
+
     /// Returns all the threads in this process except for the internal selfde threads.
     func getThreads() throws -> [Thread]
     

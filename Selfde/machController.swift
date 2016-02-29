@@ -21,6 +21,16 @@ class MachController: Controller {
         try handleError(selfdeInitMachController(&state))
     }
 
+    func getSharedLibraryInfoAddress() throws -> COpaquePointer {
+        var dyldInfo = task_dyld_info()
+        var count = mach_msg_type_number_t(sizeof(task_dyld_info) / sizeof(Int32))
+        let error = withUnsafeMutablePointer(&dyldInfo) {
+            task_info(self.state.task, task_flavor_t(TASK_DYLD_INFO), UnsafeMutablePointer<integer_t>($0), &count)
+        }
+        try handleError(error)
+        return COpaquePointer(bitPattern: UInt(dyldInfo.all_image_info_addr))
+    }
+
     func suspendThreads() throws {
         for thread in try getThreads() {
             try thread.suspend()
