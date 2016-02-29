@@ -99,9 +99,71 @@ class SelfdeTests: XCTestCase {
         XCTAssertEqual(parsePacket("$vAttach;d20c#2f"), PacketPayloadResult.Payload("vAttach;d20c"))
     }
 
+    func testRemoteDebuggingPacketExtraction() {
+        func toString(packet: ArraySlice<UInt8>) -> String {
+            var result = ""
+            for byte in packet {
+                UnicodeScalar(byte).writeTo(&result)
+            }
+            return result
+        }
+        do {
+            var partialData = [UInt8]()
+            let data = [UInt8]("+- $#00$test#00+".utf8)
+            let packets = extractPackets(&partialData, newData: data[0..<data.count])
+            XCTAssert(partialData.isEmpty)
+            XCTAssertEqual(packets.count, 5)
+            XCTAssertEqual(toString(packets[0]), "+")
+            XCTAssertEqual(toString(packets[1]), "-")
+            XCTAssertEqual(toString(packets[2]), "$#00")
+            XCTAssertEqual(toString(packets[3]), "$test#00")
+            XCTAssertEqual(toString(packets[4]), "+")
+        }
+        do {
+            var partialData = [UInt8]()
+            var data = [UInt8]("+$ab#20 $test#33 $".utf8)
+            var packets = extractPackets(&partialData, newData: data[0..<data.count])
+            XCTAssertEqual(toString(partialData[0..<partialData.count]), "$")
+            XCTAssertEqual(packets.count, 3)
+            XCTAssertEqual(toString(packets[0]), "+")
+            XCTAssertEqual(toString(packets[1]), "$ab#20")
+            XCTAssertEqual(toString(packets[2]), "$test#33")
+
+            data = [UInt8]("hello#50$test".utf8)
+            packets = extractPackets(&partialData, newData: data[0..<data.count])
+            XCTAssertEqual(toString(partialData[0..<partialData.count]), "$test")
+            XCTAssertEqual(packets.count, 1)
+            XCTAssertEqual(toString(packets[0]), "$hello#50")
+
+            data = [UInt8]("#cc$yes#1".utf8)
+            packets = extractPackets(&partialData, newData: data[0..<data.count])
+            XCTAssertEqual(toString(partialData[0..<partialData.count]), "$yes#1")
+            XCTAssertEqual(packets.count, 1)
+            XCTAssertEqual(toString(packets[0]), "$test#cc")
+
+            data = [UInt8]("2+$4#06".utf8)
+            packets = extractPackets(&partialData, newData: data[0..<data.count])
+            XCTAssert(partialData.isEmpty)
+            XCTAssertEqual(packets.count, 3)
+            XCTAssertEqual(toString(packets[0]), "$yes#12")
+            XCTAssertEqual(toString(packets[1]), "+")
+            XCTAssertEqual(toString(packets[2]), "$4#06")
+        }
+    }
+
     func testRemoteDebuggingPacketHandling() {
         enum MockError: ErrorType { case NotExpected }
-        
+
+        class MockConnection: RemoteDebuggingConnection {
+            func read() throws -> ArraySlice<UInt8> {
+                return []
+            }
+            func write(data: ArraySlice<UInt8>) throws {
+            }
+            func close() {
+            }
+        }
+
         class MockDebugger: Debugger {
             var expectedResumes: [([ThreadResumeEntry], ThreadResumeAction)]
             var expectedSetBreakpoints: [(UInt, Int)] = []
@@ -305,7 +367,9 @@ class SelfdeTests: XCTestCase {
             ([ThreadResumeEntry(thread: .ID(0x20), action: .Step, address: nil)], .Stop),
             ([ThreadResumeEntry(thread: .ID(0x20), action: .Step, address: nil)], .Continue),
             ([ThreadResumeEntry(thread: .ID(0x40), action: .Continue, address: nil)], .Step),
-            ], expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]))
+            ], expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]),
+            connection: MockConnection()
+        )
 
         XCTAssertEqual(server.handlePacketPayload("foo"), ResponseResult.Unimplemented)
         XCTAssertEqual(server.handlePacketPayload(""), ResponseResult.Unimplemented)
@@ -398,25 +462,25 @@ class SelfdeTests: XCTestCase {
         XCTAssert(server.handlePacketPayload("Hc-2").isInvalid)
 
         // Continue/step
-        XCTAssertEqual(server.handlePacketPayload("c"), ResponseResult.WaitForThreadStopReply)
-        XCTAssertEqual(server.handlePacketPayload("c0"), ResponseResult.WaitForThreadStopReply)
-        XCTAssertEqual(server.handlePacketPayload("c4000"), ResponseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("c"), ResponseResult.Resume)
+        XCTAssertEqual(server.handlePacketPayload("c0"), ResponseResult.Resume)
+        XCTAssertEqual(server.handlePacketPayload("c4000"), ResponseResult.Resume)
         XCTAssertEqual(server.handlePacketPayload("Hc40"), ResponseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("c"), ResponseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("c"), ResponseResult.Resume)
         XCTAssert(server.handlePacketPayload("c=").isInvalid)
-        XCTAssertEqual(server.handlePacketPayload("s"), ResponseResult.WaitForThreadStopReply)
-        XCTAssertEqual(server.handlePacketPayload("s123456789ab"), ResponseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("s"), ResponseResult.Resume)
+        XCTAssertEqual(server.handlePacketPayload("s123456789ab"), ResponseResult.Resume)
         XCTAssertEqual(server.handlePacketPayload("Hc0"), ResponseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("s"), ResponseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("s"), ResponseResult.Resume)
         XCTAssertEqual(server.handlePacketPayload("Hc-1"), ResponseResult.OK)
-        XCTAssertEqual(server.handlePacketPayload("s"), ResponseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("s"), ResponseResult.Resume)
         // vCont as well..
-        XCTAssertEqual(server.handlePacketPayload("vCont;c"), ResponseResult.WaitForThreadStopReply)
-        XCTAssertEqual(server.handlePacketPayload("vCont;s"), ResponseResult.WaitForThreadStopReply)
-        XCTAssertEqual(server.handlePacketPayload("vCont;c:404"), ResponseResult.WaitForThreadStopReply)
-        XCTAssertEqual(server.handlePacketPayload("vCont;s:20"), ResponseResult.WaitForThreadStopReply)
-        XCTAssertEqual(server.handlePacketPayload("vCont;c;s:20"), ResponseResult.WaitForThreadStopReply)
-        XCTAssertEqual(server.handlePacketPayload("vCont;s;c:40"), ResponseResult.WaitForThreadStopReply)
+        XCTAssertEqual(server.handlePacketPayload("vCont;c"), ResponseResult.Resume)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s"), ResponseResult.Resume)
+        XCTAssertEqual(server.handlePacketPayload("vCont;c:404"), ResponseResult.Resume)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s:20"), ResponseResult.Resume)
+        XCTAssertEqual(server.handlePacketPayload("vCont;c;s:20"), ResponseResult.Resume)
+        XCTAssertEqual(server.handlePacketPayload("vCont;s;c:40"), ResponseResult.Resume)
         XCTAssert(server.handlePacketPayload("vCont").isInvalid)
         XCTAssert(server.handlePacketPayload("vCont;").isInvalid)
         XCTAssert(server.handlePacketPayload("vCont;a").isInvalid)
@@ -495,7 +559,7 @@ class SelfdeTests: XCTestCase {
                 (0x689, ThreadStopInfo(signalNumber: 0x20, dispatchQueueAddress: nil, machInfo: nil)),
                 (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: COpaquePointer(bitPattern: 0xabc), machInfo: ThreadStopInfo.MachInfo(exceptionType: 0x40, exceptionData: [0x2,0xFFFF]))),
                 (0xc, ThreadStopInfo(signalNumber: 0xf0, dispatchQueueAddress: nil, machInfo: nil))
-            ]))
+            ]), connection: MockConnection())
             XCTAssertEqual(server.handleStopReply(ResponseResult.ThreadStopReply), ResponseResult.Response("T05thread:c;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
             XCTAssertEqual(server.handleStopReply(ResponseResult.StopReplyForThread(0x689)), ResponseResult.Response("T20thread:689;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
             XCTAssertEqual(server.handleStopReply(ResponseResult.ThreadStopReply), ResponseResult.Response("T05thread:c;qaddr:abc;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;metype:40;mecount:2;medata:2;medata:ffff;"))
@@ -542,7 +606,7 @@ extension ResponseResult: Equatable { }
 
 func == (lhs: ResponseResult, rhs: ResponseResult) -> Bool {
     switch (lhs, rhs) {
-    case (.None, .None), (.OK, .OK), (.Unimplemented, .Unimplemented), (.Invalid, .Invalid), (.Error, .Error), (.WaitForThreadStopReply, .WaitForThreadStopReply), (.ThreadStopReply, .ThreadStopReply):
+    case (.None, .None), (.OK, .OK), (.Unimplemented, .Unimplemented), (.Invalid, .Invalid), (.Error, .Error), (.Resume, .Resume), (.ThreadStopReply, .ThreadStopReply), (.Exit, .Exit):
         return true
     case (.StopReplyForThread(let x), .StopReplyForThread(let y)):
         return x == y

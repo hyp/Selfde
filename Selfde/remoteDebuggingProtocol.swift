@@ -58,13 +58,67 @@ enum PacketPayloadResult {
 
 extension CollectionType where Self.Generator.Element == UInt8 {
     // Remote debugging protocol checksum.
-    private var checksum: UInt8 {
+    var checksum: UInt8 {
         var computedChecksum: UInt8 = 0
         for byte in self {
             computedChecksum = computedChecksum &+ byte // MOD 256.
         }
         return computedChecksum
     }
+}
+
+func extractPackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>) -> [ArraySlice<UInt8>] {
+    // Get the whole data.
+    var dataBuffer = [UInt8]()
+    let data: ArraySlice<UInt8>
+    if partialData.isEmpty {
+        data = newData
+    } else {
+        swap(&dataBuffer, &partialData) // Partial data becomes empty
+        dataBuffer += newData
+        data = dataBuffer[0..<dataBuffer.count]
+    }
+    // Extracts packets.
+    var packets = [ArraySlice<UInt8>]()
+    var i = data.startIndex
+    let end = data.endIndex
+    outerLoop: while i < end {
+        switch data[i] {
+        case UInt8(ascii: "+"), UInt8(ascii: "-"):
+            // Control packet.
+            packets.append(data[i...i])
+            i = i.successor()
+            continue
+        case UInt8(ascii: "$"):
+            // Find '#'
+            var j = i.successor()
+            while j < end {
+                if data[j] == UInt8(ascii: "#") {
+                    break
+                }
+                j = j.successor()
+            }
+            guard (j + 3) <= end else {
+                // No end found.
+                break outerLoop
+            }
+            j = j.advancedBy(3) // The '#' and checksum.
+            packets.append(data[i..<j])
+            i = j
+            continue
+        default:
+            // TODO: log
+            print("Junk byte \(data[i])")
+            i = i.successor()
+            continue
+        }
+    }
+
+    // Store the partial data.
+    if i < end {
+        partialData = [UInt8](data[i..<end])
+    }
+    return packets
 }
 
 func parseRawPacket(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> PacketPayloadResult {

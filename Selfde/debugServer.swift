@@ -27,12 +27,13 @@ enum ResponseResult {
     case None
     case OK
     case Response(String)
-    case WaitForThreadStopReply
     case ThreadStopReply
     case StopReplyForThread(ThreadID)
     case Unimplemented
     case Invalid(String)
     case Error(ErrorResultKind)
+    case Resume
+    case Exit(String?)
 }
 
 struct DebugServerState {
@@ -99,10 +100,10 @@ private func handleK(inout server: DebugServerState, payload: String) -> Respons
     do {
         try server.debugger.killInferior()
         // Exit with code 9 (KILL).
-        return .Response("X09")
+        return .Exit("X09")
     } catch {
+        return .Exit(nil)
     }
-    return .None
 }
 
 // m packets read memory.
@@ -315,7 +316,7 @@ private func handleVCont(inout server: DebugServerState, payload: String) -> Res
     do {
         try server.debugger.resume(actions, defaultAction: defaultAction ?? .Stop)
         // The response will be the stopped/exited message.
-        return .WaitForThreadStopReply
+        return .Resume
     } catch {
         return .Error(.E25)
     }
@@ -336,7 +337,7 @@ private func handleContinue(inout server: DebugServerState, payload: String) -> 
     do {
         try server.debugger.resume([ ThreadResumeEntry(thread: server.continueThread, action: .Continue, address: address) ], defaultAction: .Continue)
         // Don't send an OK as the response is the stopped/exited message.
-        return .WaitForThreadStopReply
+        return .Resume
     } catch {
         return .Error(.E25)
     }
@@ -358,7 +359,7 @@ private func handleStep(inout server: DebugServerState, payload: String) -> Resp
         // Make all other threads stop when we are stepping.
         try server.debugger.resume([ ThreadResumeEntry(thread: .ID(server.continueThreadID), action: .Step, address: address) ], defaultAction: .Stop)
         // Don't send an OK as the response is the stopped/exited message.
-        return .WaitForThreadStopReply
+        return .Resume
     } catch {
         return .Error(.E49)
     }
@@ -560,10 +561,12 @@ private func handleVAttach(inout server: DebugServerState, payload: String) -> R
 // LLDB extensions reference: [[TODO]]
 class DebugServer {
     private var state: DebugServerState
+    private let connection: RemoteDebuggingConnection
     private var handlers: [(String, (inout DebugServerState, String) -> ResponseResult)]
 
-    init(debugger: Debugger) {
+    init(debugger: Debugger, connection: RemoteDebuggingConnection) {
         state = DebugServerState(debugger: debugger)
+        self.connection = connection
         handlers = []
         handlers = [
             ("?", handleHaltReasonQuery),
@@ -595,7 +598,11 @@ class DebugServer {
             ("QListThreadsInStopReply", handleQListThreadsInStopReply),
             ("QStartNoAckMode", { [unowned self] server, payload in
                 // Send OK before changing the flag.
-                self.sendResponse(.OK)
+                do {
+                    try self.sendResponse(.OK)
+                } catch {
+                    return .Exit(nil)
+                }
                 server.noAckMode = true
                 return .None
             }),
@@ -669,7 +676,7 @@ class DebugServer {
 
     func handleStopReply(result: ResponseResult) -> ResponseResult {
         switch result {
-        case .ThreadStopReply, .WaitForThreadStopReply:
+        case .ThreadStopReply:
             let threadID = state.debugger.primaryThreadID
             state.currentThread = .ID(threadID)
             return handleStopReplyForThread(threadID)
@@ -681,36 +688,100 @@ class DebugServer {
         }
     }
 
-    func sendResponse(result: ResponseResult) {
-        func send(s: String) {
-        }
+    private func sendResponse(result: ResponseResult) throws {
         switch result {
         case .None:
             break
         case .OK:
-            send("OK")
+            try send("OK")
         case .Response(let r):
-            send(r)
-        case .WaitForThreadStopReply, .ThreadStopReply, .StopReplyForThread:
-            sendResponse(handleStopReply(result))
+            try send(r)
+        case .ThreadStopReply, .StopReplyForThread:
+            try sendResponse(handleStopReply(result))
         case .Unimplemented:
-            send("")
+            try send("")
         case .Invalid:
-            send("E03")
+            try send("E03")
         case .Error(let kind):
-            send("\(kind)")
+            try send("\(kind)")
+        case .Resume, .Exit:
+            assertionFailure("Invalid response")
         }
     }
 
-    private func sendPacket(payload: String) {
+    private func send(payload: String) throws {
+        var output = [UInt8]()
+        output.reserveCapacity(1024)
+        output.append(UInt8(ascii: "$"))
+        output.appendContentsOf(payload.utf8)
         guard !state.noAckMode else {
-            // Output $\(string)#00
-            print("$\(payload)#00")
+            output.appendContentsOf("#00".utf8)
+            try connection.write(output[0..<output.count])
             return
         }
-        // Compute the hash.
-        let hash = 0
-        print("$\(payload)#TODO")
-        // TODO:
+        // Compute the checksum.
+        let checksum = output[1..<output.count].checksum
+        output.appendContentsOf("#\([checksum].hexString)".utf8)
+        try connection.write(output[0..<output.count])
     }
+
+    private func sendACK() throws {
+        let data = [UInt8(ascii: "+")]
+        try connection.write(data[0..<data.count])
+    }
+
+    private func sendNACK() throws {
+        let data = [UInt8(ascii: "-")]
+        try connection.write(data[0..<data.count])
+    }
+
+    /// Processes incoming packets until a resume or an exit packet like 'c'/'k' is reached.
+    func processPacketsUntilResumeOrExit() throws {
+        while true {
+            let packets: [ArraySlice<UInt8>]
+            if let savedData = self.savedData {
+                var partialData = [UInt8]()
+                packets = extractPackets(&partialData, newData: savedData[0..<savedData.count])
+                assert(partialData.isEmpty) // Saved data must have the full packets.
+            } else {
+                let data = try connection.read()
+                packets = extractPackets(&partialData, newData: data)
+            }
+            for (i, packet) in packets.enumerate() {
+                switch parseRawPacket(packet, checkChecksums: !state.noAckMode) {
+                case .Payload(let payload):
+                    if !state.noAckMode {
+                        try sendACK()
+                    }
+                    switch handlePacketPayload(payload) {
+                    case .Resume:
+                        // Save the next packets if there are any (unlikely).
+                        var savedData = [UInt8]()
+                        for packet in packets[(i+1)..<packets.count] {
+                            savedData += [UInt8](packet)
+                        }
+                        self.savedData = savedData
+                        return // Resume command.
+                    case .Exit(let response?):
+                        try sendResponse(.Response(response))
+                        fallthrough
+                    case .Exit:
+                        return
+                    case let result:
+                        try sendResponse(result)
+                    }
+                case .ACK, .NACK: // Don't resend on NACKs..
+                    break
+                case .InvalidPacket, .InvalidChecksum:
+                    try sendNACK()
+                case .None:
+                    assertionFailure("Packet should be present")
+                }
+            }
+            savedData = nil
+        }
+    }
+
+    private var savedData: [UInt8]?
+    private var partialData = [UInt8]()
 }
