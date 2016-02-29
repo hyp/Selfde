@@ -151,6 +151,56 @@ class SelfdeTests: XCTestCase {
         }
     }
 
+    func testDebuggingUtils() {
+        let threads = [ThreadID(2), ThreadID(400)]
+        let primaryThread = threads[0]
+
+        do {
+            let entries = [ThreadResumeEntry(thread: .ID(2), action: .Continue, address: nil)]
+            let result = extractResumeActionsForThreads(threads, primaryThread: primaryThread, entries: entries, defaultAction: .None)
+            XCTAssertEqual(result.count, 2)
+            XCTAssertEqual(result[0].0, 2)
+            XCTAssertEqual(result[0].1, ThreadResumeAction.Continue)
+            XCTAssertEqual(result[0].2, nil)
+            XCTAssertEqual(result[1].0, 400)
+            XCTAssertEqual(result[1].1, ThreadResumeAction.None)
+            XCTAssertEqual(result[1].2, nil)
+        }
+        do {
+            let entries = [ThreadResumeEntry(thread: .All, action: .Continue, address: nil)]
+            let result = extractResumeActionsForThreads(threads, primaryThread: primaryThread, entries: entries, defaultAction: .None)
+            XCTAssertEqual(result.count, 2)
+            XCTAssertEqual(result[0].0, 2)
+            XCTAssertEqual(result[0].1, ThreadResumeAction.Continue)
+            XCTAssertEqual(result[0].2, nil)
+            XCTAssertEqual(result[1].0, 400)
+            XCTAssertEqual(result[1].1, ThreadResumeAction.Continue)
+            XCTAssertEqual(result[1].2, nil)
+        }
+        do {
+            let entries = [ThreadResumeEntry(thread: .ID(2), action: .Continue, address: nil), ThreadResumeEntry(thread: .ID(400), action: .Step, address: nil)]
+            let result = extractResumeActionsForThreads(threads, primaryThread: primaryThread, entries: entries, defaultAction: .Stop)
+            XCTAssertEqual(result.count, 2)
+            XCTAssertEqual(result[0].0, 2)
+            XCTAssertEqual(result[0].1, ThreadResumeAction.Continue)
+            XCTAssertEqual(result[0].2, nil)
+            XCTAssertEqual(result[1].0, 400)
+            XCTAssertEqual(result[1].1, ThreadResumeAction.Step)
+            XCTAssertEqual(result[1].2, nil)
+        }
+        do {
+            let entries = [ThreadResumeEntry(thread: .Any, action: .Stop, address: COpaquePointer(bitPattern: 0x20)), ThreadResumeEntry(thread: .ID(400), action: .Step, address: nil)]
+            let result = extractResumeActionsForThreads(threads, primaryThread: primaryThread, entries: entries, defaultAction: .Stop)
+            XCTAssertEqual(result.count, 2)
+            XCTAssertEqual(result[0].0, 2)
+            XCTAssertEqual(result[0].1, ThreadResumeAction.Stop)
+            XCTAssertEqual(result[0].2, COpaquePointer(bitPattern: 0x20))
+            XCTAssertEqual(result[1].0, 400)
+            XCTAssertEqual(result[1].1, ThreadResumeAction.Step)
+            XCTAssertEqual(result[1].2, nil)
+        }
+    }
+
     func testRemoteDebuggingPacketHandling() {
         enum MockError: ErrorType { case NotExpected }
 
