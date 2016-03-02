@@ -39,9 +39,8 @@ class SelfdeTests: XCTestCase {
             }
 
             // Install a breakpoint in that memory.
-            let mainBreakpoint: Breakpoint
             do {
-                mainBreakpoint = try controller.installBreakpoint(executableMemory)
+                let _ = try controller.installBreakpoint(executableMemory)
             } catch {
                 XCTFail()
                 return
@@ -62,7 +61,9 @@ class SelfdeTests: XCTestCase {
                 let exception = try controller.waitForException()
                 XCTAssert(exception.thread == mainThread)
                 let hitIP = try exception.thread.getInstructionPointer()
-                XCTAssertEqual(hitIP, mainBreakpoint.expectedHitAddress)
+                #if arch(x86_64) || arch(i386)
+                    XCTAssertEqual(hitIP, COpaquePointer(UnsafePointer<UInt8>(executableMemory).successor()))
+                #endif
                 XCTAssert(exception.isBreakpoint)
                 XCTAssertEqual(exception.reason, "breakpoint")
                 try mainThread.setInstructionPointer(previousIP)

@@ -20,8 +20,6 @@ public enum ControllerError: ErrorType {
 public struct Breakpoint {
     // Breakpoint's address.
     public let address: COpaquePointer
-    // The expected value of the IP register after the breakpoint is hit.
-    public let expectedHitAddress: COpaquePointer
 }
 
 // Read/Write/Execute memory permissions.

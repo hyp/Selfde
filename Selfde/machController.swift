@@ -75,9 +75,9 @@ class MachController: Controller {
         }
         // Make sure we can write to the address.
         try memoryProtectAll(address, size: MachineBreakpointState.numberOfBytesToPatch)
-        let (machineState, expectedHitAddress) = MachineBreakpointState.create(address)
+        let machineState = MachineBreakpointState.create(address)
         breakpoints[address] = BreakpointState(machineState: machineState)
-        return Breakpoint(address: address, expectedHitAddress: expectedHitAddress)
+        return Breakpoint(address: address)
     }
 
     private func restoreBreakpointsOriginalInstruction(breakpoint: (address: COpaquePointer, BreakpointState)) {
