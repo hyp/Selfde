@@ -84,7 +84,7 @@ struct MachThread: Thread {
         var size = mach_msg_type_number_t(THREAD_INFO_MAX)
         try handleError(withUnsafeMutablePointer(&infoData) { pointer in
             let statePtr = thread_info_t(COpaquePointer(pointer))
-            return thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), statePtr, &size);
+            return thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), statePtr, &size)
         })
         return withUnsafePointer(&infoData) { pointer -> thread_basic_info in
             let basicInfoPtr = thread_basic_info_t(COpaquePointer(pointer))
