@@ -9,6 +9,7 @@ enum ErrorResultKind {
     case E01
     case E08
     case E09
+    case E16
     case E25
     case E32
     case E44
@@ -259,6 +260,22 @@ private func handleCurrentThreadQuery(inout server: DebugServerState, payload: S
     // Set the current thread as well to override the .Any and .All states.
     server.currentThread = .ID(threadID)
     return .Response("QC\(String(threadID, radix: 16, uppercase: false))")
+}
+
+// T - is the thread alive?
+private func handleThreadStatus(inout server: DebugServerState, payload: String) -> ResponseResult {
+    var parser = PacketParser(payload: payload, offset: 1)
+    guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
+        return .Invalid("No thread id given")
+    }
+    do {
+        guard try server.debugger.isThreadAlive(ThreadID(threadID)) else {
+            return .Error(.E16)
+        }
+        return .OK
+    } catch {
+        return .Error(.E16)
+    }
 }
 
 // qThreadStopInfo - info about a thread stop.
@@ -585,6 +602,7 @@ public class DebugServer {
             ("vAttach;", handleVAttach),
             ("H", handleSetCurrentThread),
             ("qC", handleCurrentThreadQuery),
+            ("T", handleThreadStatus),
             ("_M", handleAllocate),
             ("_m", handleDeallocate),
             ("qThreadStopInfo", handleQThreadStopInfo),

@@ -288,6 +288,10 @@ class SelfdeTests: XCTestCase {
                 return ThreadStopInfo(signalNumber: 0, dispatchQueueAddress: nil, machInfo: nil)
             }
 
+            func isThreadAlive(threadID: ThreadID) throws -> Bool {
+                return threadID == 0x405
+            }
+
             func setBreakpoint(address: COpaquePointer, byteSize: Int) throws {
                 guard let bp = expectedSetBreakpoints.first else {
                     throw MockError.NotExpected
@@ -533,6 +537,9 @@ class SelfdeTests: XCTestCase {
         XCTAssert(server.handlePacketPayload("Ha").isInvalid)
         XCTAssert(server.handlePacketPayload("Hc-").isInvalid)
         XCTAssert(server.handlePacketPayload("Hc-2").isInvalid)
+        XCTAssertEqual(server.handlePacketPayload("T20"), ResponseResult.Error(.E16))
+        XCTAssertEqual(server.handlePacketPayload("T405"), ResponseResult.OK)
+        XCTAssert(server.handlePacketPayload("T").isInvalid)
 
         // Continue/step
         XCTAssertEqual(server.handlePacketPayload("c"), ResponseResult.Resume)
