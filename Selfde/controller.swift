@@ -76,6 +76,8 @@ public protocol Thread {
 
     /// A unique value that identifies this thread.
     var threadID: ThreadID { get }
+
+    func getDispatchQueueAddress() throws -> COpaquePointer
 }
 
 public protocol Controller: class {

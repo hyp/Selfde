@@ -49,6 +49,12 @@ class SelfdeTests: XCTestCase {
                 return
             }
 
+            do {
+                let address = try mainThread.getDispatchQueueAddress()
+                XCTAssertNotNil(address)
+            } catch {
+                XCTFail()
+            }
             // Resume the main thread.
             dispatch_semaphore_signal(semaphore)
 

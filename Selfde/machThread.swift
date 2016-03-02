@@ -125,4 +125,8 @@ struct MachThread: Thread {
             return ThreadID(thread)
         }
     }
+
+    func getDispatchQueueAddress() throws -> COpaquePointer {
+        return COpaquePointer(bitPattern: UInt(try getIdentifierInfo().dispatch_qaddr))
+    }
 }
