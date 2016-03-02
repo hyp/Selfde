@@ -36,6 +36,7 @@ kern_return_t catch_exception_raise(mach_port_t exception_port, mach_port_t thre
 
     // Suspend the thread with the exception.
     thread_suspend(thread);
+    thread_abort_safely(thread);
 
     // Save the information.
     pthread_mutex_lock(&gExceptionMutex);
