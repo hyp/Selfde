@@ -62,8 +62,7 @@ func parsePackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>, checkC
             packets.append(extractPayloadPacket(data[i..<j], checkChecksums: checkChecksums))
             i = j
         default:
-            // TODO: log
-            print("Junk byte \(data[i])")
+            // Junk byte, Ignore.
             i = i.successor()
         }
     }
