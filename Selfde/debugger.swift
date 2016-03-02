@@ -3,52 +3,42 @@
 //  Selfde
 //
 
-// Read/Write/Execute memory permissions.
-struct MemoryPermissions: OptionSetType {
-    let rawValue: Int
-    init(rawValue: Int) { self.rawValue = 0 }
-    
-    static let Read = MemoryPermissions(rawValue: 1)
-    static let Write = MemoryPermissions(rawValue: 2)
-    static let Execute = MemoryPermissions(rawValue: 4)
-}
-
-enum MemoryReadResult {
+public enum MemoryReadResult {
     case Bytes(UnsafeBufferPointer<UInt8>)
 }
 
-typealias ThreadID = UInt64
+public typealias ThreadID = UInt64
 
-enum ThreadReference {
+public enum ThreadReference {
     case ID(ThreadID) // NNN
     case Any          // 0
     case All          // -1
 }
 
-enum ThreadResumeAction: Int {
+public enum ThreadResumeAction: Int {
     case None
     case Stop
     case Continue
     case Step
 }
 
-struct ThreadResumeEntry {
-    let thread: ThreadReference
-    let action: ThreadResumeAction
-    let address: COpaquePointer?
+public struct ThreadResumeEntry {
+    public let thread: ThreadReference
+    public let action: ThreadResumeAction
+    public let address: COpaquePointer?
 }
 
-struct ThreadStopInfo {
-    let signalNumber: UInt8
-    let dispatchQueueAddress: COpaquePointer?
-    struct MachInfo {
+public struct ThreadStopInfo {
+    public let signalNumber: UInt8
+    public let dispatchQueueAddress: COpaquePointer?
+    public struct MachInfo {
         let exceptionType: Int
         let exceptionData: [UInt]
     }
-    let machInfo: MachInfo?
+    public let machInfo: MachInfo?
 }
 
-protocol Debugger: class {
+public protocol Debugger: class {
     var registerContextSize: Int { get }
 
     var primaryThreadID: ThreadID { get }

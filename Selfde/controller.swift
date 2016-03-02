@@ -23,6 +23,16 @@ public struct Breakpoint {
     public let expectedHitAddress: COpaquePointer
 }
 
+// Read/Write/Execute memory permissions.
+public struct MemoryPermissions: OptionSetType {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = 0 }
+
+    public static let Read = MemoryPermissions(rawValue: 1)
+    public static let Write = MemoryPermissions(rawValue: 2)
+    public static let Execute = MemoryPermissions(rawValue: 4)
+}
+
 // Thread's run state.
 public enum RunState {
     case Running
@@ -73,7 +83,7 @@ public protocol Controller: class {
 
     /// Returns all the threads in this process except for the internal selfde threads.
     func getThreads() throws -> [Thread]
-    
+
     /// Suspends all the threads in this process except for the internal selfde threads.
     func suspendThreads() throws
 

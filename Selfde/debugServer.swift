@@ -559,12 +559,12 @@ private func handleVAttach(inout server: DebugServerState, payload: String) -> R
 // Implements a debug server that's partially compatible with the GDB remote protocol and supports a couple of LLDB extensions.
 // GDB protocol reference:    [[TODO]]
 // LLDB extensions reference: [[TODO]]
-class DebugServer {
+public class DebugServer {
     private var state: DebugServerState
     private let connection: RemoteDebuggingConnection
     private var handlers: [(String, (inout DebugServerState, String) -> ResponseResult)]
 
-    init(debugger: Debugger, connection: RemoteDebuggingConnection) {
+    public init(debugger: Debugger, connection: RemoteDebuggingConnection) {
         state = DebugServerState(debugger: debugger)
         self.connection = connection
         handlers = []
@@ -736,7 +736,7 @@ class DebugServer {
     }
 
     /// Processes incoming packets until a resume or an exit packet like 'c'/'k' is reached.
-    func processPacketsUntilResumeOrExit() throws {
+    public func processPacketsUntilResumeOrExit() throws {
         while true {
             let packets: [ArraySlice<UInt8>]
             if let savedData = self.savedData {

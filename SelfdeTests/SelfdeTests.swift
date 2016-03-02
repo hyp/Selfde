@@ -622,7 +622,7 @@ class SelfdeTests: XCTestCase {
 
 extension ThreadReference: Equatable { }
 
-func == (lhs: ThreadReference, rhs: ThreadReference) -> Bool {
+public func == (lhs: ThreadReference, rhs: ThreadReference) -> Bool {
     switch (lhs, rhs) {
     case (.ID(let x), .ID(let y)):
         return x == y
@@ -635,7 +635,7 @@ func == (lhs: ThreadReference, rhs: ThreadReference) -> Bool {
 
 extension ThreadResumeEntry: Equatable { }
 
-func == (lhs: ThreadResumeEntry, rhs: ThreadResumeEntry) -> Bool {
+public func == (lhs: ThreadResumeEntry, rhs: ThreadResumeEntry) -> Bool {
     return lhs.thread == rhs.thread && lhs.action == rhs.action && lhs.address == rhs.address
 }
 
