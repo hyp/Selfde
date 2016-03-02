@@ -51,7 +51,6 @@ public protocol Debugger: class {
     func resume(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction) throws
     func getStopInfoForThread(threadID: ThreadID) throws -> ThreadStopInfo
 
-    // TODO: ref count up
     func setBreakpoint(address: COpaquePointer, byteSize: Int) throws
     func removeBreakpoint(address: COpaquePointer) throws
 

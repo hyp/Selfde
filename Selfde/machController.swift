@@ -10,6 +10,7 @@ class MachController: Controller {
     private var state: SelfdeMachControllerState
     private struct BreakpointState {
         let machineState: MachineBreakpointState
+        var counter: Int
     }
     private var breakpoints: [COpaquePointer: BreakpointState] = [:]
     private struct AllocationState {
@@ -70,13 +71,16 @@ class MachController: Controller {
     }
 
     func installBreakpoint(address: COpaquePointer) throws -> Breakpoint {
-        guard breakpoints[address] == nil else {
-            throw ControllerError.BreakpointAlreadyInstalled
+        if let index = breakpoints.indexForKey(address) {
+            var bp = breakpoints[index].1
+            bp.counter += 1
+            breakpoints.updateValue(bp, forKey: address)
+            return Breakpoint(address: address)
         }
         // Make sure we can write to the address.
         try memoryProtectAll(address, size: MachineBreakpointState.numberOfBytesToPatch)
         let machineState = MachineBreakpointState.create(address)
-        breakpoints[address] = BreakpointState(machineState: machineState)
+        breakpoints[address] = BreakpointState(machineState: machineState, counter: 1)
         return Breakpoint(address: address)
     }
 
@@ -88,7 +92,14 @@ class MachController: Controller {
         guard let index = breakpoints.indexForKey(breakpoint.address) else {
             throw ControllerError.InvalidBreakpoint
         }
-        restoreBreakpointsOriginalInstruction(breakpoints[index])
+        let keyValue = breakpoints[index]
+        var bp = keyValue.1
+        bp.counter -= 1
+        guard bp.counter < 1 else {
+            breakpoints.updateValue(bp, forKey: breakpoint.address)
+            return
+        }
+        restoreBreakpointsOriginalInstruction(keyValue)
         breakpoints.removeAtIndex(index)
     }
 

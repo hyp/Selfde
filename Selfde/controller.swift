@@ -8,7 +8,6 @@ import Foundation
 public enum ControllerError: ErrorType {
     case ThreadLaunchFailure
     case MachKernelError(code: Int, message: String)
-    case BreakpointAlreadyInstalled
     case InvalidBreakpoint
     case InvalidRunState
     case InvalidRegisterID
@@ -90,8 +89,13 @@ public protocol Controller: class {
     func resumeThreads() throws
 
     /// Installs a breakpoint at the given location.
+    /// If there is already a breakpoint at a given address, then the controller
+    /// increments internal reference counter for that breakpoint. Otherwise the
+    /// reference counter for a breakpoint is set to 1.
     func installBreakpoint(address: COpaquePointer) throws -> Breakpoint
 
+    /// Decrement the internal breakpoint reference counter for that
+    /// address and remove the breakpoint if it reaches zero.
     func removeBreakpoint(breakpoint: Breakpoint) throws
 
     /// The controller thread is paused until an exception occurs.

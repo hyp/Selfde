@@ -40,7 +40,10 @@ class SelfdeTests: XCTestCase {
 
             // Install a breakpoint in that memory.
             do {
-                let _ = try controller.installBreakpoint(executableMemory)
+                let bp0 = try controller.installBreakpoint(executableMemory)
+                let bp1 = try controller.installBreakpoint(executableMemory)
+                XCTAssertEqual(bp0.address, bp1.address)
+                try controller.removeBreakpoint(bp0)
             } catch {
                 XCTFail()
                 return
