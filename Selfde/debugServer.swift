@@ -557,8 +557,8 @@ private func handleVAttach(inout server: DebugServerState, payload: String) -> R
 }
 
 // Implements a debug server that's partially compatible with the GDB remote protocol and supports a couple of LLDB extensions.
-// GDB protocol reference:    [[TODO]]
-// LLDB extensions reference: [[TODO]]
+// GDB protocol reference:    https://sourceware.org/gdb/onlinedocs/gdb/Remote-Protocol.html
+// LLDB extensions reference: <LLDB repository>/docs/lldb-gdb-remote.txt
 public class DebugServer {
     private var state: DebugServerState
     private let connection: RemoteDebuggingConnection
