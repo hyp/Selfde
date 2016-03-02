@@ -14,6 +14,7 @@ public enum ControllerError: ErrorType {
     case InvalidRegisterID
     case InvalidRegisterSetID
     case RegisterBufferIsTooSmall
+    case InvalidAllocation
 }
 
 public struct Breakpoint {
@@ -94,9 +95,15 @@ public protocol Controller: class {
     func installBreakpoint(address: COpaquePointer) throws -> Breakpoint
 
     func removeBreakpoint(breakpoint: Breakpoint) throws
-    
+
     /// The controller thread is paused until an exception occurs.
     func waitForException() throws -> Exception
+
+    /// Allocates memory in this process with the given permissions.
+    func allocate(size: Int, permissions: MemoryPermissions) throws -> COpaquePointer
+
+    /// Deallocates the memory that was previously allocated with the `allocate` method.
+    func deallocate(address: COpaquePointer) throws
 }
 
 /// Launches the controller thread.

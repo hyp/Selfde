@@ -2,76 +2,92 @@
 //  SelfdeTests.swift
 //  SelfdeTests
 //
-//  Created by alex on 21/02/2016.
-//  Copyright © 2016 hyp. All rights reserved.
-//
 
 import XCTest
 @testable import Selfde
 
 class SelfdeTests: XCTestCase {
-    
-    override func setUp() {
-        super.setUp()
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-    }
-    
-    override func tearDown() {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-        super.tearDown()
-    }
-    
-    private var threadStackAddress: COpaquePointer?
 
-    func threadRun() {
-        var stack: Int = 0xDEADBEEF
-        withUnsafePointer(&stack) {
-            threadStackAddress = COpaquePointer($0)
-            print(threadStackAddress)
+    func testController() {
+        // Main thread info.
+        let mainThread: Thread
+        do {
+            mainThread = try getCurrentThread()
+        } catch {
+            XCTFail()
+            return
         }
-        var j = 0
-        // Run some code for a long time so that the controller can drop a breakpoint into it.
-        for i in 0..<1000000000 {
-            j = j &+ i
-        }
-        print("Test thread:", j)
-    }
 
-    func testExample() {
-       /* do {
-            // Helper thread.
-            let thread = NSThread(target:self, selector:#selector(self.threadRun), object:nil)
-            thread.start()
-            try runSelfdeController { controller in
+        // Used to signal the main thread that the breakpoint is installed.
+        let semaphore = dispatch_semaphore_create(0)
+
+        runSelfdeController ({ controller in
+            // Allocate an executable memory region.
+            let executableMemory: COpaquePointer
+            do {
+                executableMemory = try controller.allocate(1024, permissions: [.Read, .Write, .Execute])
+            } catch {
+                XCTFail()
+                return
+            }
+            defer {
                 do {
-                
-                    try controller.suspendThreads()
-                    print("Test threads are suspended")
-                    let threads = try controller.getThreads()
-                    for thread in threads  {
-                        let state = try thread.getRunState()
-                        XCTAssertEqual(state, RunState.Waiting)
-                        let ip = try thread.getInstructionPointer()
-                        let sp = try thread.getStackPointer()
-                        print("Thread: \(thread.opaqueValue), runState: \(state), ip = \(ip), sp = \(sp)")
-                    }
-                    if let last = threads.last {
-                        let bp = try controller.installBreakpoint(last.getInstructionPointer())
-                        //try controller.removeBreakpoint(bp)
-                    }
-                    sleep(5)
-                    try controller.resumeThreads()
-                    print("Test threads are resumed")
-                    sleep(5)
+                    try controller.deallocate(executableMemory)
                 } catch {
                     XCTFail()
                 }
             }
-        } catch {
+
+            // Install a breakpoint in that memory.
+            let mainBreakpoint: Breakpoint
+            do {
+                mainBreakpoint = try controller.installBreakpoint(executableMemory)
+            } catch {
+                XCTFail()
+                return
+            }
+
+            // Resume the main thread.
+            dispatch_semaphore_signal(semaphore)
+
+            // Suspend the thread and jump to the executable region with the breakpoint.
+            let previousIP: COpaquePointer
+            do {
+                let state = try mainThread.getRunState()
+                XCTAssertEqual(state, RunState.Running)
+                try mainThread.suspend()
+                previousIP = try mainThread.getInstructionPointer()
+                try mainThread.setInstructionPointer(executableMemory)
+                try mainThread.resume()
+                let exception = try controller.waitForException()
+                XCTAssert(exception.thread == mainThread)
+                let hitIP = try exception.thread.getInstructionPointer()
+                XCTAssertEqual(hitIP, mainBreakpoint.expectedHitAddress)
+                XCTAssert(exception.isBreakpoint)
+                XCTAssertEqual(exception.reason, "breakpoint")
+                try mainThread.setInstructionPointer(previousIP)
+                try mainThread.resume()
+            } catch {
+                XCTFail()
+                return
+            }
+        }, errorCallback: { error in
             XCTFail()
-        }*/
+        })
+        dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER)
+        // Long running loop so that the controller can suspend the main thread.
+        var j = 0xDead1007
+        var f = 2.0
+        for i in 0..<1000000 {
+            j ^= i
+            if (i % 100) == 0{
+                f += 0.5
+            }
+        }
+        XCTAssertEqual(j, 3735883783)
+        XCTAssertEqual(f, 5002.0)
     }
-    
+
     func testRemoteDebuggingProtocol() {
         XCTAssertEqual(UnicodeScalar("0").hexValue, 0)
         XCTAssertEqual(UnicodeScalar("a").hexValue, 10)

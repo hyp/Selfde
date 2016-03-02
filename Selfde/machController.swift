@@ -12,6 +12,11 @@ class MachController: Controller {
         let machineState: MachineBreakpointState
     }
     private var breakpoints: [COpaquePointer: BreakpointState] = [:]
+    private struct AllocationState {
+        let address: mach_vm_address_t
+        let size: mach_vm_size_t
+    }
+    private var allocations: [COpaquePointer: AllocationState] = [:]
 
     init() throws {
         state = SelfdeMachControllerState(task: 0, controllerThread: 0, msgServerThread: 0, exceptionPort: 0)
@@ -91,5 +96,37 @@ class MachController: Controller {
         var exception = SelfdeMachException()
         try handleError(selfdeWaitForException(&state, &exception))
         return Exception(thread: MachThread(exception.thread), code: exception.exception)
+    }
+
+    func allocate(size: Int, permissions: MemoryPermissions) throws -> COpaquePointer {
+        var address = mach_vm_address_t()
+        let allocationSize = mach_vm_size_t(size)
+        try handleError(mach_vm_allocate(state.task, &address, allocationSize, 1))
+        var protection: vm_prot_t = 0
+        if permissions.contains(.Read) {
+            protection |= getVMProtRead()
+        }
+        if permissions.contains(.Write) {
+            protection |= getVMProtWrite()
+        }
+        if permissions.contains(.Execute) {
+            protection |= getVMProtExecute()
+        }
+        do {
+            try handleError(mach_vm_protect(state.task, address, allocationSize, 0, protection))
+        } catch {
+            mach_vm_deallocate(state.task, address, allocationSize)
+            throw error
+        }
+        let result = COpaquePointer(bitPattern: UInt(address))
+        allocations[result] = AllocationState(address: address, size: allocationSize)
+        return result
+    }
+
+    func deallocate(address: COpaquePointer) throws {
+        guard let allocation = allocations[address] else {
+            throw ControllerError.InvalidAllocation
+        }
+        try handleError(mach_vm_deallocate(state.task, allocation.address, allocation.size))
     }
 }
