@@ -31,7 +31,7 @@ final class RemoteDebuggingSocketIO: RemoteDebuggingConnection {
 
     func read() throws -> ArraySlice<UInt8> {
         let readSize = buffer.withUnsafeMutableBufferPointer { (inout ptr: UnsafeMutableBufferPointer<UInt8>) in
-            CFReadStreamRead(readStream.takeUnretainedValue(), ptr.baseAddress, buffer.count)
+            CFReadStreamRead(readStream.takeUnretainedValue(), ptr.baseAddress, 1024)
         }
         guard readSize > 0 else {
             throw RemoteDebuggingIOError.ReadError(message: readSize == 0 ? "Reached stream end" : "Stream disconnected")
