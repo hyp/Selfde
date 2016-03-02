@@ -7,8 +7,6 @@ public enum MemoryReadResult {
     case Bytes(UnsafeBufferPointer<UInt8>)
 }
 
-public typealias ThreadID = UInt64
-
 public enum ThreadReference {
     case ID(ThreadID) // NNN
     case Any          // 0

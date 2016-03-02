@@ -10,11 +10,11 @@ public func getCurrentThread() throws -> Thread {
 }
 
 public func ==(lhs: Thread, rhs: Thread) -> Bool {
-    return lhs.opaqueValue == rhs.opaqueValue
+    return lhs.threadID == rhs.threadID
 }
 
 public func !=(lhs: Thread, rhs: Thread) -> Bool {
-    return lhs.opaqueValue != rhs.opaqueValue
+    return lhs.threadID != rhs.threadID
 }
 
 public func getRegisterContextSize() -> Int {
@@ -85,11 +85,20 @@ struct MachThread: Thread {
         try handleError(withUnsafeMutablePointer(&infoData) { pointer in
             let statePtr = thread_info_t(COpaquePointer(pointer))
             return thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), statePtr, &size);
-            })
+        })
         return withUnsafePointer(&infoData) { pointer -> thread_basic_info in
             let basicInfoPtr = thread_basic_info_t(COpaquePointer(pointer))
             return basicInfoPtr.memory
         }
+    }
+
+    private func getIdentifierInfo() throws -> thread_identifier_info {
+        var info = thread_identifier_info()
+        var size = mach_msg_type_number_t(sizeofValue(info) / sizeof(integer_t))
+        try handleError(withUnsafeMutablePointer(&info) { pointer in
+            thread_info(thread, thread_flavor_t(THREAD_IDENTIFIER_INFO), thread_info_t(pointer), &size)
+        })
+        return info
     }
 
     func getRunState() throws -> RunState {
@@ -109,7 +118,11 @@ struct MachThread: Thread {
         }
     }
 
-    var opaqueValue: Int {
-        return Int(thread)
+    var threadID: ThreadID {
+        do {
+            return try getIdentifierInfo().thread_id
+        } catch {
+            return ThreadID(thread)
+        }
     }
 }

@@ -16,6 +16,8 @@ public enum ControllerError: ErrorType {
     case InvalidAllocation
 }
 
+public typealias ThreadID = UInt64
+
 public struct Breakpoint {
     // Breakpoint's address.
     public let address: COpaquePointer
@@ -72,8 +74,8 @@ public protocol Thread {
 
     func getRunState() throws -> RunState
 
-    /// An opaque value that identifies this thread.
-    var opaqueValue: Int { get }
+    /// A unique value that identifies this thread.
+    var threadID: ThreadID { get }
 }
 
 public protocol Controller: class {
