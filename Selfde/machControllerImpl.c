@@ -32,10 +32,6 @@ static pthread_mutex_t gExceptionMutex;
 static dispatch_semaphore_t gExceptionSemaphore;
 
 kern_return_t catch_exception_raise(mach_port_t exception_port, mach_port_t thread, mach_port_t task, exception_type_t exception, exception_data_t codeVector, mach_msg_type_number_t codeCount) {
-    // LOG
-#if defined (__APPLE__)
-    pthread_setname_np("exception monitoring thread");
-#endif
     printf("catch_exception_raise - me: %d, victim: %d, exception type: %d\n", mach_thread_self(), thread, exception);
 
     // Suspend the thread with the exception.
@@ -61,6 +57,9 @@ kern_return_t catch_exception_raise(mach_port_t exception_port, mach_port_t thre
 extern boolean_t exc_server(mach_msg_header_t *msg, mach_msg_header_t *reply);
 
 static void *exceptionHandlerThreadMain(void *arg) {
+#if defined (__APPLE__)
+    pthread_setname_np("exception monitoring thread");
+#endif
     // Get the port and set the message server thread in the state.
     ExceptionHandlerContext *context = (ExceptionHandlerContext *)arg;
     mach_port_t port = context->state->exceptionPort;
