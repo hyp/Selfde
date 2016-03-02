@@ -19,12 +19,12 @@ public protocol RemoteDebuggingConnection: class {
     func close()
 }
 
-final class RemoteDebuggingSocketIO: RemoteDebuggingConnection {
-    private let readStream: Unmanaged<CFReadStream>
-    private let writeStream: Unmanaged<CFWriteStream>
-    private var buffer: [UInt8] = [UInt8](count: 1024, repeatedValue: 0)
+private final class RemoteDebuggingSocketIO: RemoteDebuggingConnection {
+    let readStream: Unmanaged<CFReadStream>
+    let writeStream: Unmanaged<CFWriteStream>
+    var buffer: [UInt8] = [UInt8](count: 1024, repeatedValue: 0)
 
-    private init(readStream: Unmanaged<CFReadStream>, writeStream: Unmanaged<CFWriteStream>) {
+    init(readStream: Unmanaged<CFReadStream>, writeStream: Unmanaged<CFWriteStream>) {
         self.readStream = readStream
         self.writeStream = writeStream
     }
