@@ -3,15 +3,6 @@
 //  Selfde
 //
 
-enum PacketPayloadResult {
-    case None
-    case Payload(String)
-    case ACK
-    case NACK
-    case InvalidChecksum
-    case InvalidPacket
-}
-
 extension CollectionType where Self.Generator.Element == UInt8 {
     // Remote debugging protocol checksum.
     var checksum: UInt8 {
@@ -23,7 +14,15 @@ extension CollectionType where Self.Generator.Element == UInt8 {
     }
 }
 
-func extractPackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>) -> [ArraySlice<UInt8>] {
+enum RemoteDebuggingPacket {
+    case Payload(String)
+    case ACK
+    case NACK
+    case InvalidChecksum
+    case InvalidPacket
+}
+
+func parsePackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>, checkChecksums: Bool = true) -> [RemoteDebuggingPacket] {
     // Get the whole data.
     var dataBuffer = [UInt8]()
     let data: ArraySlice<UInt8>
@@ -35,16 +34,17 @@ func extractPackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>) -> [
         data = dataBuffer[0..<dataBuffer.count]
     }
     // Extracts packets.
-    var packets = [ArraySlice<UInt8>]()
+    var packets = [RemoteDebuggingPacket]()
     var i = data.startIndex
     let end = data.endIndex
     outerLoop: while i < end {
         switch data[i] {
-        case UInt8(ascii: "+"), UInt8(ascii: "-"):
-            // Control packet.
-            packets.append(data[i...i])
+        case UInt8(ascii: "+"):
+            packets.append(.ACK)
             i = i.successor()
-            continue
+        case UInt8(ascii: "-"):
+            packets.append(.NACK)
+            i = i.successor()
         case UInt8(ascii: "$"):
             // Find '#'
             var j = i.successor()
@@ -59,14 +59,12 @@ func extractPackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>) -> [
                 break outerLoop
             }
             j = j.advancedBy(3) // The '#' and checksum.
-            packets.append(data[i..<j])
+            packets.append(extractPayloadPacket(data[i..<j], checkChecksums: checkChecksums))
             i = j
-            continue
         default:
             // TODO: log
             print("Junk byte \(data[i])")
             i = i.successor()
-            continue
         }
     }
 
@@ -77,48 +75,36 @@ func extractPackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>) -> [
     return packets
 }
 
-func parseRawPacket(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> PacketPayloadResult {
-    guard let first = data.first else {
-        // Empty packet, ignore.
-        return .None
-    }
-    switch first {
-    case UInt8(ascii: "$"):
-        let info = data.dropFirst(1)
-        guard info.count >= 3 else {
-            return .InvalidPacket
-        }
-        let checksumInfo = info.suffix(3)
-        let payload = info.dropLast(3)
-
-        // Extract the sent checksum.
-        if checkChecksums {
-            assert(checksumInfo.count == 3)
-            let checksumString = String(UnicodeScalar(checksumInfo[checksumInfo.startIndex.successor()])) + String(UnicodeScalar(checksumInfo[checksumInfo.startIndex.advancedBy(2)]))
-            guard let checksum = Int(checksumString, radix: 16) where checksumInfo[checksumInfo.startIndex] == UInt8(ascii: "#") else {
-                return .InvalidPacket
-            }
-            
-            // Compute the checksum.
-            if checksum != Int(payload.checksum) {
-                return .InvalidChecksum
-            }
-        }
-
-        // Return the payload.
-        var str = ""
-        str.reserveCapacity(payload.count)
-        for byte in payload {
-            str.write(String(UnicodeScalar(byte)))
-        }
-        return .Payload(str)
-    case UInt8(ascii: "+"):
-        return .ACK
-    case UInt8(ascii: "-"):
-        return .NACK
-    default:
+private func extractPayloadPacket(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> RemoteDebuggingPacket {
+    assert(data.first == Optional(UInt8(ascii: "$")))
+    let info = data.dropFirst(1)
+    guard info.count >= 3 else {
         return .InvalidPacket
     }
+    let checksumInfo = info.suffix(3)
+    let payload = info.dropLast(3)
+
+    // Extract the sent checksum.
+    if checkChecksums {
+        assert(checksumInfo.count == 3)
+        let checksumString = String(UnicodeScalar(checksumInfo[checksumInfo.startIndex.successor()])) + String(UnicodeScalar(checksumInfo[checksumInfo.startIndex.advancedBy(2)]))
+        guard let checksum = Int(checksumString, radix: 16) where checksumInfo[checksumInfo.startIndex] == UInt8(ascii: "#") else {
+            return .InvalidPacket
+        }
+
+        // Compute the checksum.
+        if checksum != Int(payload.checksum) {
+            return .InvalidChecksum
+        }
+    }
+
+    // Return the payload.
+    var str = ""
+    str.reserveCapacity(payload.count)
+    for byte in payload {
+        str.write(String(UnicodeScalar(byte)))
+    }
+    return .Payload(str)
 }
 
 // Parses the debugger packet payloads.

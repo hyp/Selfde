@@ -738,17 +738,17 @@ public class DebugServer {
     /// Processes incoming packets until a resume or an exit packet like 'c'/'k' is reached.
     public func processPacketsUntilResumeOrExit() throws {
         while true {
-            let packets: [ArraySlice<UInt8>]
-            if let savedData = self.savedData {
-                var partialData = [UInt8]()
-                packets = extractPackets(&partialData, newData: savedData[0..<savedData.count])
-                assert(partialData.isEmpty) // Saved data must have the full packets.
+            let packets: [RemoteDebuggingPacket]
+            if let savedPackets = self.savedPackets {
+                assert(!savedPackets.isEmpty)
+                packets = savedPackets
+                self.savedPackets = nil
             } else {
                 let data = try connection.read()
-                packets = extractPackets(&partialData, newData: data)
+                packets = parsePackets(&partialData, newData: data, checkChecksums: !state.noAckMode)
             }
             for (i, packet) in packets.enumerate() {
-                switch parseRawPacket(packet, checkChecksums: !state.noAckMode) {
+                switch packet {
                 case .Payload(let payload):
                     if !state.noAckMode {
                         try sendACK()
@@ -756,11 +756,10 @@ public class DebugServer {
                     switch handlePacketPayload(payload) {
                     case .Resume:
                         // Save the next packets if there are any (unlikely).
-                        var savedData = [UInt8]()
-                        for packet in packets[(i+1)..<packets.count] {
-                            savedData += [UInt8](packet)
+                        let remainingPackets = packets[(i+1)..<packets.count]
+                        if !remainingPackets.isEmpty {
+                            savedPackets = Array(remainingPackets)
                         }
-                        self.savedData = savedData
                         return // Resume command.
                     case .Exit(let response?):
                         try sendResponse(.Response(response))
@@ -774,14 +773,11 @@ public class DebugServer {
                     break
                 case .InvalidPacket, .InvalidChecksum:
                     try sendNACK()
-                case .None:
-                    assertionFailure("Packet should be present")
                 }
             }
-            savedData = nil
         }
     }
 
-    private var savedData: [UInt8]?
+    private var savedPackets: [RemoteDebuggingPacket]?
     private var partialData = [UInt8]()
 }

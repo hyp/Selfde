@@ -101,22 +101,25 @@ class SelfdeTests: XCTestCase {
         XCTAssertEqual([UInt8(1), 0xaa, 3].hexString, "01aa03")
         XCTAssertEqual([UInt8(0xFF), 0xAb, 0xe, 0, 0xd].hexString, "ffab0e000d")
 
-        func parsePacket(s: String) -> PacketPayloadResult {
+        func parsePacket(s: String) -> RemoteDebuggingPacket {
             let bytes = s.utf8.map { UInt8($0) }
-            return parseRawPacket(bytes[0..<bytes.count])
+            var partialData = [UInt8]()
+            let result = parsePackets(&partialData, newData: bytes[0..<bytes.count])
+            XCTAssert(partialData.isEmpty)
+            XCTAssertEqual(result.count, 1)
+            return result[0]
         }
 
-        XCTAssertEqual(parsePacket(""), PacketPayloadResult.None)
-        XCTAssertEqual(parsePacket("$QStartNoAckMode#b0"), PacketPayloadResult.Payload("QStartNoAckMode"))
-        XCTAssertEqual(parsePacket("$qSupported:xmlRegisters=i386,arm,mips#12"), PacketPayloadResult.Payload("qSupported:xmlRegisters=i386,arm,mips"))
-        XCTAssertEqual(parsePacket("$qHostInfo#9b"), PacketPayloadResult.Payload("qHostInfo"))
-        XCTAssertEqual(parsePacket("$qHostInfo#9B"), PacketPayloadResult.Payload("qHostInfo"))
-        XCTAssertEqual(parsePacket("$qHostInfo#00"), PacketPayloadResult.InvalidChecksum)
-        XCTAssertEqual(parsePacket("$qHostInfo0"), PacketPayloadResult.InvalidPacket)
-        XCTAssertEqual(parsePacket("+"), PacketPayloadResult.ACK)
-        XCTAssertEqual(parsePacket("-"), PacketPayloadResult.NACK)
-        XCTAssertEqual(parsePacket("ha"), PacketPayloadResult.InvalidPacket)
-        XCTAssertEqual(parsePacket("$vAttach;d20c#2f"), PacketPayloadResult.Payload("vAttach;d20c"))
+        XCTAssertEqual(parsePacket("$QStartNoAckMode#b0"), RemoteDebuggingPacket.Payload("QStartNoAckMode"))
+        XCTAssertEqual(parsePacket("$qSupported:xmlRegisters=i386,arm,mips#12"), RemoteDebuggingPacket.Payload("qSupported:xmlRegisters=i386,arm,mips"))
+        XCTAssertEqual(parsePacket("$qHostInfo#9b"), RemoteDebuggingPacket.Payload("qHostInfo"))
+        XCTAssertEqual(parsePacket("$qHostInfo#9B"), RemoteDebuggingPacket.Payload("qHostInfo"))
+        XCTAssertEqual(parsePacket("$qHostInfo#00"), RemoteDebuggingPacket.InvalidChecksum)
+        XCTAssertEqual(parsePacket("$qHostInfo#--"), RemoteDebuggingPacket.InvalidPacket)
+        XCTAssertEqual(parsePacket("+"), RemoteDebuggingPacket.ACK)
+        XCTAssertEqual(parsePacket("-"), RemoteDebuggingPacket.NACK)
+        XCTAssertEqual(parsePacket("$ha#ha"), RemoteDebuggingPacket.InvalidPacket)
+        XCTAssertEqual(parsePacket("$vAttach;d20c#2f"), RemoteDebuggingPacket.Payload("vAttach;d20c"))
     }
 
     func testRemoteDebuggingPacketExtraction() {
@@ -130,44 +133,44 @@ class SelfdeTests: XCTestCase {
         do {
             var partialData = [UInt8]()
             let data = [UInt8]("+- $#00$test#00+".utf8)
-            let packets = extractPackets(&partialData, newData: data[0..<data.count])
+            let packets = parsePackets(&partialData, newData: data[0..<data.count], checkChecksums: false)
             XCTAssert(partialData.isEmpty)
             XCTAssertEqual(packets.count, 5)
-            XCTAssertEqual(toString(packets[0]), "+")
-            XCTAssertEqual(toString(packets[1]), "-")
-            XCTAssertEqual(toString(packets[2]), "$#00")
-            XCTAssertEqual(toString(packets[3]), "$test#00")
-            XCTAssertEqual(toString(packets[4]), "+")
+            XCTAssertEqual(packets[0], RemoteDebuggingPacket.ACK)
+            XCTAssertEqual(packets[1], RemoteDebuggingPacket.NACK)
+            XCTAssertEqual(packets[2], RemoteDebuggingPacket.Payload(""))
+            XCTAssertEqual(packets[3], RemoteDebuggingPacket.Payload("test"))
+            XCTAssertEqual(packets[4], RemoteDebuggingPacket.ACK)
         }
         do {
             var partialData = [UInt8]()
             var data = [UInt8]("+$ab#20 $test#33 $".utf8)
-            var packets = extractPackets(&partialData, newData: data[0..<data.count])
+            var packets = parsePackets(&partialData, newData: data[0..<data.count], checkChecksums: false)
             XCTAssertEqual(toString(partialData[0..<partialData.count]), "$")
             XCTAssertEqual(packets.count, 3)
-            XCTAssertEqual(toString(packets[0]), "+")
-            XCTAssertEqual(toString(packets[1]), "$ab#20")
-            XCTAssertEqual(toString(packets[2]), "$test#33")
+            XCTAssertEqual(packets[0], RemoteDebuggingPacket.ACK)
+            XCTAssertEqual(packets[1], RemoteDebuggingPacket.Payload("ab"))
+            XCTAssertEqual(packets[2], RemoteDebuggingPacket.Payload("test"))
 
             data = [UInt8]("hello#50$test".utf8)
-            packets = extractPackets(&partialData, newData: data[0..<data.count])
+            packets = parsePackets(&partialData, newData: data[0..<data.count], checkChecksums: false)
             XCTAssertEqual(toString(partialData[0..<partialData.count]), "$test")
             XCTAssertEqual(packets.count, 1)
-            XCTAssertEqual(toString(packets[0]), "$hello#50")
+            XCTAssertEqual(packets[0], RemoteDebuggingPacket.Payload("hello"))
 
             data = [UInt8]("#cc$yes#1".utf8)
-            packets = extractPackets(&partialData, newData: data[0..<data.count])
+            packets = parsePackets(&partialData, newData: data[0..<data.count], checkChecksums: false)
             XCTAssertEqual(toString(partialData[0..<partialData.count]), "$yes#1")
             XCTAssertEqual(packets.count, 1)
-            XCTAssertEqual(toString(packets[0]), "$test#cc")
+            XCTAssertEqual(packets[0], RemoteDebuggingPacket.Payload("test"))
 
             data = [UInt8]("2+$4#06".utf8)
-            packets = extractPackets(&partialData, newData: data[0..<data.count])
+            packets = parsePackets(&partialData, newData: data[0..<data.count], checkChecksums: false)
             XCTAssert(partialData.isEmpty)
             XCTAssertEqual(packets.count, 3)
-            XCTAssertEqual(toString(packets[0]), "$yes#12")
-            XCTAssertEqual(toString(packets[1]), "+")
-            XCTAssertEqual(toString(packets[2]), "$4#06")
+            XCTAssertEqual(packets[0], RemoteDebuggingPacket.Payload("yes"))
+            XCTAssertEqual(packets[1], RemoteDebuggingPacket.ACK)
+            XCTAssertEqual(packets[2], RemoteDebuggingPacket.Payload("4"))
         }
     }
 
@@ -659,13 +662,13 @@ public func == (lhs: ThreadResumeEntry, rhs: ThreadResumeEntry) -> Bool {
     return lhs.thread == rhs.thread && lhs.action == rhs.action && lhs.address == rhs.address
 }
 
-extension PacketPayloadResult: Equatable { }
+extension RemoteDebuggingPacket: Equatable { }
 
-func == (lhs: PacketPayloadResult, rhs: PacketPayloadResult) -> Bool {
+func == (lhs: RemoteDebuggingPacket, rhs: RemoteDebuggingPacket) -> Bool {
     switch (lhs, rhs) {
     case (.Payload(let x), .Payload(let y)):
         return x == y
-    case (.None, .None), (.InvalidChecksum, .InvalidChecksum), (.ACK, .ACK), (.NACK, .NACK), (.InvalidPacket, .InvalidPacket):
+    case (.InvalidChecksum, .InvalidChecksum), (.ACK, .ACK), (.NACK, .NACK), (.InvalidPacket, .InvalidPacket):
         return true
     default:
         return false
