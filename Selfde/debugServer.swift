@@ -454,7 +454,7 @@ private func handleQThreadSuffixSupported(inout server: DebugServerState, payloa
 }
 
 // This will enable thread information in the stop reply packet.s
-func handleQListThreadsInStopReply(inout server: DebugServerState, payload: String) -> ResponseResult {
+private func handleQListThreadsInStopReply(inout server: DebugServerState, payload: String) -> ResponseResult {
     server.listThreadsInStopReply = true
     return .OK
 }
