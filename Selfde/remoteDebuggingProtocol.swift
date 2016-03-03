@@ -111,7 +111,7 @@ struct PacketParser {
     private let payload: String.UnicodeScalarView
     private var index: String.UnicodeScalarIndex
     private let endIndex: String.UnicodeScalarIndex
-    
+
     init(payload: String, offset: Int = 0) {
         self.payload = payload.unicodeScalars
         index = self.payload.startIndex.advancedBy(offset)
@@ -136,22 +136,21 @@ struct PacketParser {
         index = index.successor()
         return result
     }
-    
-    mutating func expectAndConsume(c: UnicodeScalar) -> Bool {
+
+    mutating func consumeIfPresent(c: UnicodeScalar) -> Bool {
         guard index < endIndex && payload[index] == c else {
             return false
         }
         index = index.successor()
         return true
     }
-    
-    mutating func expectAndConsumeComma() -> Bool {
-        return expectAndConsume(",")
+
+    mutating func consumeComma() -> Bool {
+        return consumeIfPresent(",")
     }
-    
-    // HEX
-    // Bit endian integer (most significant bytes come first).
-    mutating func expectAndConsumeHexBigEndianInteger() -> UInt? {
+
+    // Big endian unsigned integer (most significant bytes come first).
+    mutating func consumeHexUInt() -> UInt? {
         var count = 0 // The number of hex characters.
         var result: UInt = 0
         while index < endIndex {
@@ -170,8 +169,9 @@ struct PacketParser {
         return result
     }
 
-    mutating func expectAndConsumeHexBigEndianAddress() -> COpaquePointer? {
-        guard let address = expectAndConsumeHexBigEndianInteger() else {
+    // Addresses are represented with big endian unsigned integers.
+    mutating func consumeAddress() -> COpaquePointer? {
+        guard let address = consumeHexUInt() else {
             return nil
         }
         return COpaquePointer(bitPattern: address)

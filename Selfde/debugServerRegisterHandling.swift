@@ -129,7 +129,7 @@ struct DebuggerRegisterState {
 // qRegisterInfo can be used to query the register set.
 func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "qRegisterInfo".characters.count)
-    guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
+    guard let registerID = parser.consumeHexUInt().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
     }
     guard registerID < server.registerState.registers.count else {
@@ -229,7 +229,7 @@ func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> Res
 // p register
 func handleRegisterRead(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
+    guard let registerID = parser.consumeHexUInt().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
     }
     guard let threadID = server.extractThreadID(payload) else {
@@ -256,10 +256,10 @@ func handleRegisterRead(inout server: DebugServerState, payload: String) -> Resp
 // P register = value
 func handleRegisterWrite(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    guard let registerID = parser.expectAndConsumeHexBigEndianInteger().flatMap({ Int($0) }) else {
+    guard let registerID = parser.consumeHexUInt().flatMap({ Int($0) }) else {
         return .Invalid("Invalid register number")
     }
-    guard parser.expectAndConsume("=") else {
+    guard parser.consumeIfPresent("=") else {
         return .Invalid("Missing equals sign")
     }
     guard registerID < server.registerState.registers.count else {

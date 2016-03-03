@@ -85,7 +85,7 @@ extension DebugServerState {
             return nil
         }
         var parser = PacketParser(payload: payload, offset: range.endIndex)
-        guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
+        guard let threadID = parser.consumeHexUInt() else {
             return nil
         }
         return ThreadID(threadID)
@@ -110,13 +110,13 @@ private func handleK(inout server: DebugServerState, payload: String) -> Respons
 // m packets read memory.
 private func handleMemoryRead(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    guard let address = parser.expectAndConsumeHexBigEndianAddress() else {
+    guard let address = parser.consumeAddress() else {
         return .Invalid("Missing address")
     }
-    guard parser.expectAndConsumeComma() else {
+    guard parser.consumeComma() else {
         return .Invalid("Missing comma")
     }
-    guard let size = parser.expectAndConsumeHexBigEndianInteger() else {
+    guard let size = parser.consumeHexUInt() else {
         return .Invalid("Missing size")
     }
     guard size != 0 else {
@@ -135,19 +135,19 @@ private func handleMemoryRead(inout server: DebugServerState, payload: String) -
 // M packets write memory.
 private func handleMemoryWrite(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    guard let address = parser.expectAndConsumeHexBigEndianAddress() else {
+    guard let address = parser.consumeAddress() else {
         return .Invalid("Missing address")
     }
-    guard parser.expectAndConsumeComma() else {
+    guard parser.consumeComma() else {
         return .Invalid("Missing comma")
     }
-    guard let size = parser.expectAndConsumeHexBigEndianInteger() else {
+    guard let size = parser.consumeHexUInt() else {
         return .Invalid("Missing size")
     }
     guard size != 0 else {
         return .OK
     }
-    guard parser.expectAndConsume(UnicodeScalar(":")) else {
+    guard parser.consumeIfPresent(UnicodeScalar(":")) else {
         return .Invalid("Missing colon")
     }
     guard let bytes = parser.readHexBytes() else {
@@ -167,10 +167,10 @@ private func handleMemoryWrite(inout server: DebugServerState, payload: String) 
 // _M packets allocate memory with permissions (useful for JIT).
 private func handleAllocate(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 2)
-    guard let size = parser.expectAndConsumeHexBigEndianInteger() else {
+    guard let size = parser.consumeHexUInt() else {
         return .Invalid("Missing size")
     }
-    guard parser.expectAndConsumeComma() else {
+    guard parser.consumeComma() else {
         return .Invalid("Missing comma")
     }
     var permissions: MemoryPermissions = []
@@ -197,7 +197,7 @@ private func handleAllocate(inout server: DebugServerState, payload: String) -> 
 // _m packets deallocate memory that was allocated using _M.
 private func handleDeallocate(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 2)
-    guard let address: COpaquePointer = parser.expectAndConsumeHexBigEndianAddress() else {
+    guard let address: COpaquePointer = parser.consumeAddress() else {
         return .Error(.E54)
     }
     do {
@@ -215,13 +215,13 @@ private enum ValueResponseResult<T> {
 
 extension PacketParser {
     private mutating func parseThreadReference() -> ValueResponseResult<ThreadReference> {
-        if expectAndConsume("-") {
-            guard expectAndConsume("1") else {
+        if consumeIfPresent("-") {
+            guard consumeIfPresent("1") else {
                 return .None(.Invalid("Invalid thread number"))
             }
             return .Some(.All)
         } else {
-            guard let threadID = expectAndConsumeHexBigEndianInteger() else {
+            guard let threadID = consumeHexUInt() else {
                 return .None(.Invalid("Invalid thread number"))
             }
             return .Some(threadID == 0 ? .Any : .ID(ThreadID(threadID)))
@@ -265,7 +265,7 @@ private func handleCurrentThreadQuery(inout server: DebugServerState, payload: S
 // T - is the thread alive?
 private func handleThreadStatus(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
+    guard let threadID = parser.consumeHexUInt() else {
         return .Invalid("No thread id given")
     }
     do {
@@ -281,7 +281,7 @@ private func handleThreadStatus(inout server: DebugServerState, payload: String)
 // qThreadStopInfo - info about a thread stop.
 private func handleQThreadStopInfo(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "qThreadStopInfo".characters.count)
-    guard let threadID = parser.expectAndConsumeHexBigEndianInteger() else {
+    guard let threadID = parser.consumeHexUInt() else {
         return .Invalid("No thread id given")
     }
     return .StopReplyForThread(ThreadID(threadID))
@@ -303,7 +303,7 @@ private func handleVCont(inout server: DebugServerState, payload: String) -> Res
     var parser = PacketParser(payload: payload, offset: "vCont".characters.count)
     var actions: [ThreadResumeEntry] = []
     var defaultAction: ThreadResumeAction?
-    while parser.expectAndConsume(";") {
+    while parser.consumeIfPresent(";") {
         let action: ThreadResumeAction
         switch parser.consumeCharacter() {
         case "c"?:
@@ -313,7 +313,7 @@ private func handleVCont(inout server: DebugServerState, payload: String) -> Res
         default:
             return .Invalid("Unsupported vCont action")
         }
-        if parser.expectAndConsume(":") {
+        if parser.consumeIfPresent(":") {
             switch parser.parseThreadReference() {
             case .Some(let thread):
                 actions.append(ThreadResumeEntry(thread: thread, action: action, address: .None))
@@ -344,7 +344,7 @@ private func handleContinue(inout server: DebugServerState, payload: String) -> 
     var parser = PacketParser(payload: payload, offset: 1)
     let address: COpaquePointer?
     if parser.hasContents {
-        guard let addr = parser.expectAndConsumeHexBigEndianAddress() else {
+        guard let addr = parser.consumeAddress() else {
             return .Invalid("Invalid address")
         }
         address = addr
@@ -365,7 +365,7 @@ private func handleStep(inout server: DebugServerState, payload: String) -> Resp
     var parser = PacketParser(payload: payload, offset: 1)
     let address: COpaquePointer?
     if parser.hasContents {
-        guard let addr = parser.expectAndConsumeHexBigEndianAddress() else {
+        guard let addr = parser.consumeAddress() else {
             return .Invalid("Invalid address")
         }
         address = addr
@@ -389,16 +389,16 @@ private func handleZ(inout server: DebugServerState, payload: String) -> Respons
         breakpointType = parser.consumeCharacter() else {
             return .Invalid("")
     }
-    guard parser.expectAndConsumeComma() else {
+    guard parser.consumeComma() else {
         return .Invalid("Missing comma separator")
     }
-    guard let address = parser.expectAndConsumeHexBigEndianAddress() else {
+    guard let address = parser.consumeAddress() else {
         return .Invalid("Invalid address")
     }
-    guard parser.expectAndConsumeComma() else {
+    guard parser.consumeComma() else {
         return .Invalid("Missing comma separator")
     }
-    guard let byteSize = parser.expectAndConsumeHexBigEndianInteger() else {
+    guard let byteSize = parser.consumeHexUInt() else {
         return .Invalid("Invalid byte size / kind")
     }
     
@@ -559,7 +559,7 @@ private func handleQEcho(inout server: DebugServerState, payload: String) -> Res
 // Note: vAttachOrWait, vAttachName, vAttachWait aren't supported.
 private func handleVAttach(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "vAttach;".characters.count)
-    guard let processID = parser.expectAndConsumeHexBigEndianInteger() else {
+    guard let processID = parser.consumeHexUInt() else {
         return .Invalid("No PID given")
     }
     do {
