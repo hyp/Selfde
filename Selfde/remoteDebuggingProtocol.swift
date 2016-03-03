@@ -149,24 +149,40 @@ struct PacketParser {
         return consumeIfPresent(",")
     }
 
-    // Big endian unsigned integer (most significant bytes come first).
-    mutating func consumeHexUInt() -> UInt? {
+    private mutating func parseHexUInt64() -> (UInt64, Int) {
         var count = 0 // The number of hex characters.
-        var result: UInt = 0
+        var result: UInt64 = 0
         while index < endIndex {
             guard let value = payload[index].hexValue else {
                 break
             }
             result <<= 4
-            result |= UInt(value)
+            result |= UInt64(value)
             count += 1
             index = index.successor()
         }
-        guard count != 0 && count <= (sizeof(UInt) * 2) else {
+        return (result, count)
+    }
+
+    // Big endian unsigned 64 bit integer (most significant bytes come first).
+    mutating func consumeHexUInt64() -> UInt64? {
+        let (value, characterCount) = parseHexUInt64()
+        guard characterCount != 0 && characterCount <= (sizeof(UInt64) * 2) else {
             // Empty string or too many hex digits.
             return nil
         }
-        return result
+        return value
+    }
+
+    // Big endian unsigned integer (most significant bytes come first).
+    mutating func consumeHexUInt() -> UInt? {
+        let (value, characterCount) = parseHexUInt64()
+        guard characterCount != 0 && characterCount <= (sizeof(UInt) * 2) else {
+            // Empty string or too many hex digits.
+            return nil
+        }
+        // We can truncate here as we've made sure the number fits into the UInt.
+        return UInt(truncatingBitPattern: value)
     }
 
     // Addresses are represented with big endian unsigned integers.

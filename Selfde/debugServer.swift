@@ -75,6 +75,15 @@ struct DebugServerState {
     }
 }
 
+extension PacketParser {
+    private mutating func consumeThreadID() -> ThreadID? {
+        guard let value = consumeHexUInt64() else {
+            return nil
+        }
+        return ThreadID(value)
+    }
+}
+
 extension DebugServerState {
     // Extracts the 'thread:NNN' suffix or returns the current thread ID.
     mutating func extractThreadID(payload: String) -> ThreadID? {
@@ -85,10 +94,7 @@ extension DebugServerState {
             return nil
         }
         var parser = PacketParser(payload: payload, offset: range.endIndex)
-        guard let threadID = parser.consumeHexUInt() else {
-            return nil
-        }
-        return ThreadID(threadID)
+        return parser.consumeThreadID()
     }
 }
 
@@ -221,10 +227,10 @@ extension PacketParser {
             }
             return .Some(.All)
         } else {
-            guard let threadID = consumeHexUInt() else {
+            guard let threadID = consumeThreadID() else {
                 return .None(.Invalid("Invalid thread number"))
             }
-            return .Some(threadID == 0 ? .Any : .ID(ThreadID(threadID)))
+            return .Some(threadID == 0 ? .Any : .ID(threadID))
         }
     }
 }
@@ -265,11 +271,11 @@ private func handleCurrentThreadQuery(inout server: DebugServerState, payload: S
 // T - is the thread alive?
 private func handleThreadStatus(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    guard let threadID = parser.consumeHexUInt() else {
+    guard let threadID = parser.consumeThreadID() else {
         return .Invalid("No thread id given")
     }
     do {
-        guard try server.debugger.isThreadAlive(ThreadID(threadID)) else {
+        guard try server.debugger.isThreadAlive(threadID) else {
             return .Error(.E16)
         }
         return .OK
@@ -281,10 +287,10 @@ private func handleThreadStatus(inout server: DebugServerState, payload: String)
 // qThreadStopInfo - info about a thread stop.
 private func handleQThreadStopInfo(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "qThreadStopInfo".characters.count)
-    guard let threadID = parser.consumeHexUInt() else {
+    guard let threadID = parser.consumeThreadID() else {
         return .Invalid("No thread id given")
     }
-    return .StopReplyForThread(ThreadID(threadID))
+    return .StopReplyForThread(threadID)
 }
 
 // vCont?
