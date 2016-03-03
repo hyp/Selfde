@@ -74,6 +74,8 @@ public protocol Thread {
 
     func getRunState() throws -> RunState
 
+    func getSuspendCount() throws -> Int
+
     /// A unique value that identifies this thread.
     var threadID: ThreadID { get }
 

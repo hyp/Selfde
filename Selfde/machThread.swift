@@ -118,6 +118,10 @@ struct MachThread: Thread {
         }
     }
 
+    func getSuspendCount() throws -> Int {
+        return Int(try getBasicInfo().suspend_count)
+    }
+
     var threadID: ThreadID {
         do {
             return try getIdentifierInfo().thread_id

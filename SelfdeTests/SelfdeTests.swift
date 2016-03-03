@@ -55,8 +55,23 @@ class SelfdeTests: XCTestCase {
             } catch {
                 XCTFail()
             }
+
+            do {
+                let count = try mainThread.getSuspendCount()
+                XCTAssertEqual(count, 0)
+            } catch {
+                XCTFail()
+            }
+
             // Resume the main thread.
             dispatch_semaphore_signal(semaphore)
+
+            do {
+                let count = try mainThread.getSuspendCount()
+                XCTAssertEqual(count, 0)
+            } catch {
+                XCTFail()
+            }
 
             // Suspend the thread and jump to the executable region with the breakpoint.
             let previousIP: COpaquePointer
@@ -64,6 +79,8 @@ class SelfdeTests: XCTestCase {
                 let state = try mainThread.getRunState()
                 XCTAssertEqual(state, RunState.Running)
                 try mainThread.suspend()
+                var count = try mainThread.getSuspendCount()
+                XCTAssertEqual(count, 1)
                 previousIP = try mainThread.getInstructionPointer()
                 try mainThread.setInstructionPointer(executableMemory)
                 try mainThread.resume()
@@ -76,6 +93,8 @@ class SelfdeTests: XCTestCase {
                 XCTAssert(exception.isBreakpoint)
                 XCTAssertEqual(exception.reason, "breakpoint")
                 try mainThread.setInstructionPointer(previousIP)
+                count = try mainThread.getSuspendCount()
+                XCTAssertEqual(count, 1)
                 try mainThread.resume()
             } catch {
                 XCTFail()
