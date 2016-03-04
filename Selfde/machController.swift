@@ -11,9 +11,11 @@ class MachController: Controller {
     private var state: SelfdeMachControllerState
     private struct BreakpointState {
         let machineState: MachineBreakpointState
+        let landingAddress: COpaquePointer
         var counter: Int
     }
     private var breakpoints: [COpaquePointer: BreakpointState] = [:]
+    private var breakpointLandingAddresses: [COpaquePointer: COpaquePointer] = [:]
     private struct AllocationState {
         let address: mach_vm_address_t
         let size: mach_vm_size_t
@@ -51,7 +53,21 @@ class MachController: Controller {
         state.hasCaughtException = false
         free(state.caughtException.exceptionData)
         pthread_mutex_unlock(&state.synchronisationMutex)
+        try handleException(result)
         return result
+    }
+
+    private func handleException(exception: Exception) throws {
+        guard exception.isBreakpoint else {
+            return
+        }
+        // We want to move the IP back to the breakpoint's address when we hit a breakpoint.
+        let IP = try exception.thread.getInstructionPointer()
+        guard let address = breakpointLandingAddresses[IP] else {
+            // We could have simply stepped.
+            return
+        }
+        try exception.thread.setInstructionPointer(address)
     }
 
     func getSharedLibraryInfoAddress() throws -> COpaquePointer {
@@ -121,8 +137,9 @@ class MachController: Controller {
         }
         // Make sure we can write to the address.
         try memoryProtectAll(address, size: MachineBreakpointState.numberOfBytesToPatch)
-        let machineState = MachineBreakpointState.create(address)
-        breakpoints[address] = BreakpointState(machineState: machineState, counter: 1)
+        let (machineState, landingAddress) = MachineBreakpointState.create(address)
+        breakpoints[address] = BreakpointState(machineState: machineState, landingAddress: landingAddress, counter: 1)
+        breakpointLandingAddresses[landingAddress] = address
         return Breakpoint(address: address)
     }
 
@@ -143,6 +160,11 @@ class MachController: Controller {
         }
         restoreBreakpointsOriginalInstruction(keyValue)
         breakpoints.removeAtIndex(index)
+        guard let address = breakpointLandingAddresses.removeValueForKey(bp.landingAddress) else {
+            assertionFailure()
+            return
+        }
+        assert(address == breakpoint.address)
     }
 
     func allocate(size: Int, permissions: MemoryPermissions) throws -> COpaquePointer {

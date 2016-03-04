@@ -93,9 +93,7 @@ class SelfdeTests: XCTestCase {
                 let exception = try controller.waitForException()
                 XCTAssert(exception.thread == mainThread)
                 let hitIP = try exception.thread.getInstructionPointer()
-                #if arch(x86_64) || arch(i386)
-                    XCTAssertEqual(hitIP, COpaquePointer(UnsafePointer<UInt8>(executableMemory).successor()))
-                #endif
+                XCTAssertEqual(hitIP, executableMemory)
                 XCTAssert(exception.isBreakpoint)
                 XCTAssertEqual(exception.reason, "breakpoint")
                 XCTAssertEqual(exception.data.count, 2)

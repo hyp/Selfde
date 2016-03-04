@@ -19,11 +19,11 @@ struct BreakpointStateX86_64 {
         UnsafeMutablePointer<UInt8>(address).memory = originalByte
     }
 
-    static func create(address: COpaquePointer) -> MachineBreakpointState {
+    static func create(address: COpaquePointer) -> (MachineBreakpointState, landingAddress: COpaquePointer) {
         let bytes = UnsafeMutablePointer<UInt8>(address)
         let result = MachineBreakpointState(originalByte: bytes.memory)
         bytes.memory = UInt8(0xCC) // INT 3.
-        return result
+        return (result, landingAddress: COpaquePointer(bytes.successor()))
     }
 
     // The number of bytes that have to be modified after the address in order to install a breakpoint.
