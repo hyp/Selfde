@@ -9,6 +9,8 @@ import Darwin.Mach
 public struct Exception {
     public let thread: Thread
     public let type: exception_type_t
+    // Mach kernel exception data.
+    public let data: [UInt]
 }
 
 public extension Exception {

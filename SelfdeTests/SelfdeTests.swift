@@ -92,6 +92,7 @@ class SelfdeTests: XCTestCase {
                 #endif
                 XCTAssert(exception.isBreakpoint)
                 XCTAssertEqual(exception.reason, "breakpoint")
+                XCTAssertEqual(exception.data.count, 2)
                 try mainThread.setInstructionPointer(previousIP)
                 count = try mainThread.getSuspendCount()
                 XCTAssertEqual(count, 1)
