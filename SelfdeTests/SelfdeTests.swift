@@ -17,6 +17,12 @@ class SelfdeTests: XCTestCase {
             XCTFail()
             return
         }
+        // Initial stop reason.
+        do {
+            let exception = Exception.stopOnDebuggerAttachmentExceptionForThread(mainThread)
+            XCTAssertEqual(exception.reason, "software")
+            XCTAssertEqual(exception.signalNumber, 0x11)
+        }
 
         // Used to signal the main thread that the breakpoint is installed.
         let semaphore = dispatch_semaphore_create(0)

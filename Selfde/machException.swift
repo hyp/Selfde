@@ -89,4 +89,10 @@ public extension Exception {
             return "<unknown>"
         }
     }
+
+    // Creates an exception that describes the initial stop reason of the thread for the remote debugger after the
+    // debugger attached to the process.
+    public static func stopOnDebuggerAttachmentExceptionForThread(thread: Thread) -> Exception {
+        return Exception(thread: thread, type: exception_type_t(EXC_SOFTWARE), data: [UInt(EXC_SOFT_SIGNAL), 0x11])
+    }
 }
