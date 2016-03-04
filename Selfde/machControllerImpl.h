@@ -14,20 +14,28 @@
 extern "C" {
 #endif
 
-typedef struct SelfdeMachException {
+typedef struct SelfdeCaughtMachException {
     mach_port_t thread;
-    exception_type_t exception;
-} SelfdeMachException;
+    exception_type_t exceptionType;
+    mach_exception_data_type_t *exceptionData;
+    mach_msg_type_number_t exceptionDataSize;
+} SelfdeCaughtMachException;
 
 typedef struct SelfdeMachControllerState {
     mach_port_t task;
     mach_port_t controllerThread;
     mach_port_t msgServerThread;
     mach_port_t exceptionPort;
+    pthread_cond_t synchronisationCondition;
+    pthread_mutex_t synchronisationMutex;
+    SelfdeCaughtMachException caughtException;
+    bool hasCaughtException;
 } SelfdeMachControllerState;
 
+kern_return_t selfdeCreateExceptionPort(mach_port_t task, mach_port_t *exceptionPort);
+kern_return_t selfdeSetExceptionPortForThread(mach_port_t thread, mach_port_t exceptionPort);
+kern_return_t selfdeStartExceptionThread(SelfdeMachControllerState *state);
 int selfdeInitMachController(SelfdeMachControllerState *state);
-int selfdeWaitForException(SelfdeMachControllerState *state, SelfdeMachException *exception);
 
 vm_prot_t getVMProtAll();
 vm_prot_t getVMProtRead();

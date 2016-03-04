@@ -4,6 +4,7 @@
 //
 
 import Darwin.Mach
+import Foundation
 
 /// Implements the Selfde controller for a process running on a Mach kernel.
 class MachController: Controller {
@@ -20,11 +21,36 @@ class MachController: Controller {
     private var allocations: [COpaquePointer: AllocationState] = [:]
 
     init() throws {
-        state = SelfdeMachControllerState(task: 0, controllerThread: 0, msgServerThread: 0, exceptionPort: 0)
-        // Init
-        // Init exception handler.
-        // TODO: handle errors.
+        // Create the synchronisation primitives.
+        var condition = pthread_cond_t()
+        pthread_cond_init(&condition, nil)
+        var mutex = pthread_mutex_t()
+        pthread_mutex_init(&mutex, nil)
+
+        state = SelfdeMachControllerState(task: 0, controllerThread: 0, msgServerThread: 0, exceptionPort: 0, synchronisationCondition: condition, synchronisationMutex: mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
         try handleError(selfdeInitMachController(&state))
+
+        // Create the exception port and make sure it's connected to the threads we're interested in.
+        try handleError(selfdeCreateExceptionPort(state.task, &state.exceptionPort))
+        for thread in try getMachThreads() {
+            try handleError(selfdeSetExceptionPortForThread(thread, state.exceptionPort))
+        }
+
+        // Run the thread that will listen for the exceptions.
+        try handleError(selfdeStartExceptionThread(&state))
+        print("Initialized controller thread! Controller thread: \(MachThread(state.controllerThread).threadID), message server thread: \(MachThread(state.msgServerThread).threadID)")
+    }
+
+    func waitForException() throws -> Exception {
+        pthread_mutex_lock(&state.synchronisationMutex)
+        while !state.hasCaughtException {
+            pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
+        }
+        let result = Exception(thread: MachThread(state.caughtException.thread), code: state.caughtException.exceptionType)
+        state.hasCaughtException = false
+        free(state.caughtException.exceptionData)
+        pthread_mutex_unlock(&state.synchronisationMutex)
+        return result
     }
 
     func getSharedLibraryInfoAddress() throws -> COpaquePointer {
@@ -47,6 +73,21 @@ class MachController: Controller {
         for thread in try getThreads() {
             try thread.resume()
         }
+    }
+
+    private func getMachThreads() throws -> [mach_port_t] {
+        var threads = thread_act_port_array_t(nil)
+        var count = mach_msg_type_number_t(0)
+        try handleError(task_threads(state.task, &threads, &count))
+        var result = [mach_port_t]()
+        for i in 0..<count {
+            let thread = threads[Int(i)]
+            if thread == state.controllerThread || thread == state.msgServerThread {
+                continue;
+            }
+            result.append(thread)
+        }
+        return result
     }
 
     func getThreads() throws -> [Thread] {
@@ -101,12 +142,6 @@ class MachController: Controller {
         }
         restoreBreakpointsOriginalInstruction(keyValue)
         breakpoints.removeAtIndex(index)
-    }
-
-    func waitForException() throws -> Exception {
-        var exception = SelfdeMachException()
-        try handleError(selfdeWaitForException(&state, &exception))
-        return Exception(thread: MachThread(exception.thread), code: exception.exception)
     }
 
     func allocate(size: Int, permissions: MemoryPermissions) throws -> COpaquePointer {
