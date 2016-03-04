@@ -4,7 +4,7 @@
 //
 
 // Processes the debugger resume commands and extracts concrete actions for all of the given threads.
-func extractResumeActionsForThreads(threads: [ThreadID], primaryThread: ThreadID, entries: [ThreadResumeEntry], defaultAction: ThreadResumeAction) -> [(ThreadID, ThreadResumeAction, COpaquePointer?)] {
+public func extractResumeActionsForThreads(threads: [ThreadID], primaryThread: ThreadID, entries: [ThreadResumeEntry], defaultAction: ThreadResumeAction) -> [(ThreadID, ThreadResumeAction, COpaquePointer?)] {
     var results = [ThreadID: (ThreadID, ThreadResumeAction, COpaquePointer?)]()
     for entry in entries {
         switch entry.thread {

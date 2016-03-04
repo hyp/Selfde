@@ -786,6 +786,14 @@ public class DebugServer {
         }
     }
 
+    public func sendStopReply() throws {
+        return try sendResponse(.ThreadStopReply)
+    }
+
+    public func sendExitReply() throws {
+        return try sendResponse(.Response("X00"))
+    }
+
     private var savedPackets: [RemoteDebuggingPacket]?
     private var partialData = [UInt8]()
 }

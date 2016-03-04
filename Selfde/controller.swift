@@ -21,6 +21,10 @@ public typealias ThreadID = UInt64
 public struct Breakpoint {
     // Breakpoint's address.
     public let address: COpaquePointer
+
+    public init(address: COpaquePointer) {
+        self.address = address
+    }
 }
 
 // Read/Write/Execute memory permissions.

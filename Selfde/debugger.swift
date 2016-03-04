@@ -37,8 +37,19 @@ public struct ThreadStopInfo {
     public struct MachInfo {
         let exceptionType: Int
         let exceptionData: [UInt]
+
+        public init(exceptionType: Int, exceptionData: [UInt]) {
+            self.exceptionType = exceptionType
+            self.exceptionData = exceptionData
+        }
     }
     public let machInfo: MachInfo?
+
+    public init(signalNumber: UInt8, dispatchQueueAddress: COpaquePointer?, machInfo: MachInfo?) {
+        self.signalNumber = signalNumber
+        self.dispatchQueueAddress = dispatchQueueAddress
+        self.machInfo = machInfo
+    }
 }
 
 public protocol Debugger: class {
