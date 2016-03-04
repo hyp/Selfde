@@ -26,6 +26,11 @@ public struct ThreadResumeEntry {
     public let address: COpaquePointer?
 }
 
+public enum ProcessResumeAction {
+    case ResumeThreads(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction)
+    case Exit
+}
+
 public struct ThreadStopInfo {
     public let signalNumber: UInt8
     public let dispatchQueueAddress: COpaquePointer?
@@ -46,7 +51,6 @@ public protocol Debugger: class {
     func killInferior() throws
     func getSharedLibraryInfoAddress() throws -> COpaquePointer
 
-    func resume(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction) throws
     func getStopInfoForThread(threadID: ThreadID) throws -> ThreadStopInfo
     func isThreadAlive(threadID: ThreadID) throws -> Bool
 

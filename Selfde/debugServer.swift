@@ -33,7 +33,7 @@ enum ResponseResult {
     case Unimplemented
     case Invalid(String)
     case Error(ErrorResultKind)
-    case Resume
+    case Resume(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction)
     case Exit(String?)
 }
 
@@ -336,13 +336,8 @@ private func handleVCont(inout server: DebugServerState, payload: String) -> Res
     guard defaultAction != nil || !actions.isEmpty else {
         return .Invalid("No action specified")
     }
-    do {
-        try server.debugger.resume(actions, defaultAction: defaultAction ?? .Stop)
-        // The response will be the stopped/exited message.
-        return .Resume
-    } catch {
-        return .Error(.E25)
-    }
+    // The response will be the stopped/exited message.
+    return .Resume(actions: actions, defaultAction: defaultAction ?? .Stop)
 }
 
 // c [addr]
@@ -357,13 +352,8 @@ private func handleContinue(inout server: DebugServerState, payload: String) -> 
     } else {
         address = nil
     }
-    do {
-        try server.debugger.resume([ ThreadResumeEntry(thread: server.continueThread, action: .Continue, address: address) ], defaultAction: .Continue)
-        // Don't send an OK as the response is the stopped/exited message.
-        return .Resume
-    } catch {
-        return .Error(.E25)
-    }
+    // Don't send an OK as the response is the stopped/exited message.
+    return .Resume(actions: [ ThreadResumeEntry(thread: server.continueThread, action: .Continue, address: address) ], defaultAction: .Continue)
 }
 
 // s [addr]
@@ -378,14 +368,8 @@ private func handleStep(inout server: DebugServerState, payload: String) -> Resp
     } else {
         address = nil
     }
-    do {
-        // Make all other threads stop when we are stepping.
-        try server.debugger.resume([ ThreadResumeEntry(thread: .ID(server.continueThreadID), action: .Step, address: address) ], defaultAction: .Stop)
-        // Don't send an OK as the response is the stopped/exited message.
-        return .Resume
-    } catch {
-        return .Error(.E49)
-    }
+    // Don't send an OK as the response is the stopped/exited message.
+    return .Resume(actions: [ ThreadResumeEntry(thread: .ID(server.continueThreadID), action: .Step, address: address) ], defaultAction: .Stop)
 }
 
 // z/Z packets control the breakpoints/watchpoints.
@@ -760,7 +744,7 @@ public class DebugServer {
     }
 
     /// Processes incoming packets until a resume or an exit packet like 'c'/'k' is reached.
-    public func processPacketsUntilResumeOrExit() throws {
+    public func processPacketsUntilResumeOrExit() throws -> ProcessResumeAction {
         while true {
             let packets: [RemoteDebuggingPacket]
             if let savedPackets = self.savedPackets {
@@ -778,18 +762,18 @@ public class DebugServer {
                         try sendACK()
                     }
                     switch handlePacketPayload(payload) {
-                    case .Resume:
+                    case .Resume(let actions, let defaultAction):
                         // Save the next packets if there are any (unlikely).
                         let remainingPackets = packets[(i+1)..<packets.count]
                         if !remainingPackets.isEmpty {
                             savedPackets = Array(remainingPackets)
                         }
-                        return // Resume command.
+                        return .ResumeThreads(actions: actions, defaultAction: defaultAction)
                     case .Exit(let response?):
                         try sendResponse(.Response(response))
                         fallthrough
                     case .Exit:
-                        return
+                        return .Exit
                     case let result:
                         try sendResponse(result)
                     }
