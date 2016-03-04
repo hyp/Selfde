@@ -26,6 +26,35 @@ public extension Exception {
         return type == EXC_BAD_INSTRUCTION
     }
 
+    // The signal number of this exception that's compatible with the remote debugging protocol.
+    public var signalNumber: Int32 {
+        switch type {
+        case EXC_BREAKPOINT:
+            return SIGTRAP
+        // LLDB:
+        /* We translate the /usr/include/mach/exception_types.h exception types
+        (e.g. EXC_BAD_ACCESS) to the fake BSD signal numbers that gdb uses
+        in include/gdb/signals.h (e.g. TARGET_EXC_BAD_ACCESS).  These hard
+        coded values for TARGET_EXC_BAD_ACCESS et al must match the gdb
+        values in its include/gdb/signals.h.  */
+        case EXC_BAD_ACCESS:
+            return 0x91 //TARGET_EXC_BAD_ACCESS
+        case EXC_BAD_INSTRUCTION:
+            return 0x92 //TARGET_EXC_BAD_INSTRUCTION
+        case EXC_ARITHMETIC:
+            return 0x93 //TARGET_EXC_ARITHMETIC
+        case EXC_EMULATION:
+            return 0x94 //TARGET_EXC_EMULATION
+        case EXC_SOFTWARE:
+            if (data.count == 2 && data[0] == UInt(EXC_SOFT_SIGNAL)) {
+                return Int32(data[1])
+            }
+            return 0x95 //TARGET_EXC_SOFTWARE
+        default:
+            return 0
+        }
+    }
+
     public var reason: String {
         switch type {
         case EXC_BAD_ACCESS:
