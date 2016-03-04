@@ -93,7 +93,14 @@ kern_return_t selfdeCreateExceptionPort(mach_port_t task, mach_port_t *exception
 }
 
 kern_return_t selfdeSetExceptionPortForThread(mach_port_t thread, mach_port_t exceptionPort) {
-    return thread_set_exception_ports(thread, EXC_MASK_BREAKPOINT, exceptionPort, EXCEPTION_DEFAULT, THREAD_STATE_NONE);
+    return thread_set_exception_ports(thread, (EXC_MASK_BAD_ACCESS |
+                                               EXC_MASK_BAD_INSTRUCTION |
+                                               EXC_MASK_ARITHMETIC |
+                                               EXC_MASK_EMULATION |
+                                               EXC_MASK_SOFTWARE |
+                                               EXC_MASK_BREAKPOINT |
+                                               EXC_MASK_RPC_ALERT |
+                                               EXC_MASK_MACHINE), exceptionPort, EXCEPTION_DEFAULT, THREAD_STATE_NONE);
 }
 
 kern_return_t selfdeStartExceptionThread(SelfdeMachControllerState *state) {
