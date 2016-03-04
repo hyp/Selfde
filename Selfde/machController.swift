@@ -46,7 +46,7 @@ class MachController: Controller {
         while !state.hasCaughtException {
             pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
         }
-        let result = Exception(thread: MachThread(state.caughtException.thread), code: state.caughtException.exceptionType)
+        let result = Exception(thread: MachThread(state.caughtException.thread), type: state.caughtException.exceptionType)
         state.hasCaughtException = false
         free(state.caughtException.exceptionData)
         pthread_mutex_unlock(&state.synchronisationMutex)

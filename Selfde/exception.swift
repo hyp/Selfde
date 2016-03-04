@@ -8,28 +8,24 @@ import Darwin.Mach
 // An exception that occured, like a breakpoint.
 public struct Exception {
     public let thread: Thread
-    public let code: exception_type_t
+    public let type: exception_type_t
 }
 
 public extension Exception {
     public var isBreakpoint: Bool {
-        return code == EXC_BREAKPOINT
+        return type == EXC_BREAKPOINT
     }
 
     public var isBadAccess: Bool {
-        return code == EXC_BAD_ACCESS
+        return type == EXC_BAD_ACCESS
     }
 
     public var isBadInstruction: Bool {
-        return code == EXC_BAD_INSTRUCTION
-    }
-
-    public var isArithmetic: Bool {
-        return code == EXC_ARITHMETIC
+        return type == EXC_BAD_INSTRUCTION
     }
 
     public var reason: String {
-        switch code {
+        switch type {
         case EXC_BAD_ACCESS:
             return "bad access"
         case EXC_BAD_INSTRUCTION:
