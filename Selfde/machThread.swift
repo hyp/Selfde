@@ -75,8 +75,8 @@ public struct Thread {
         try handleError(thread_resume(thread))
     }
 
-    public func abort() throws {
-        try handleError(thread_abort(thread))
+    public func syncState() throws {
+        try handleError(thread_abort_safely(thread))
     }
 
     private func getBasicInfo() throws -> thread_basic_info {
