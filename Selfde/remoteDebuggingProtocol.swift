@@ -14,6 +14,49 @@ extension CollectionType where Self.Generator.Element == UInt8 {
     }
 }
 
+// Binary encoding that's used for x/X packets.
+// Characters '}'  '#'  '$'  '*' are escaped with '}' (0x7d) character and then XOR'ed with 0x20.
+extension CollectionType where Self.Generator.Element == UInt8, Self.Index == Int {
+    var encodedBinaryData: [UInt8] {
+        var output = [UInt8]()
+        output.reserveCapacity((count * 3) / 2) // Reserve 1.5 capacity to have enough space for escaped characters.
+        for byte in self {
+            switch byte {
+            case UInt8(ascii: "#"), UInt8(ascii: "$"), UInt8(ascii: "}"), UInt8(ascii: "*"):
+                output.append(UInt8(ascii: "}"))
+                output.append(byte ^ 0x20)
+            default:
+                output.append(byte)
+            }
+        }
+        return output
+    }
+
+    var decodedBinaryData: [UInt8] {
+        var output = [UInt8]()
+        output.reserveCapacity(count)
+        var i = startIndex
+        let end = endIndex
+        while i < end {
+            switch self[i] {
+            case UInt8(ascii: "}"):
+                let nextIndex = i.successor()
+                guard nextIndex < end else {
+                    output.append(UInt8(ascii: "}"))
+                    i = nextIndex
+                    break
+                }
+                output.append(self[nextIndex] ^ 0x20)
+                i = i.advancedBy(2)
+            case let byte:
+                output.append(byte)
+                i = i.successor()
+            }
+        }
+        return output
+    }
+}
+
 enum RemoteDebuggingPacket {
     case Payload(String)
     case ACK

@@ -208,6 +208,24 @@ class SelfdeTests: XCTestCase {
         }
     }
 
+    func testRemoteDebuggingProtocolBinaryEncoding() {
+        do {
+            let data = Array("Hello #$*wor}ld".utf8)
+            let encodedData = data.encodedBinaryData
+            XCTAssertEqual(data.count + 4, encodedData.count)
+            XCTAssertEqual(encodedData, [72, 101, 108, 108, 111, 32, 125, 3, 125, 4, 125, 10, 119, 111, 114, 125, 93, 108, 100])
+            let decodedData = encodedData.decodedBinaryData
+            XCTAssertEqual(data, decodedData)
+        }
+        do {
+            let data = Array("Test 2".utf8) + [0xff, 0xfe, 0xcc]
+            let encodedData = data.encodedBinaryData
+            XCTAssertEqual(data, encodedData)
+            let decodedData = encodedData.decodedBinaryData
+            XCTAssertEqual(data, decodedData)
+        }
+    }
+
     func testDebuggingUtils() {
         let threads = [ThreadID(2), ThreadID(400)]
         let primaryThread = threads[0]
