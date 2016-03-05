@@ -11,6 +11,12 @@ public struct Exception {
     public let type: exception_type_t
     // Mach kernel exception data.
     public let data: [UInt]
+
+    public init(thread: Thread, type: exception_type_t, data: [UInt]) {
+        self.thread = thread
+        self.type = type
+        self.data = data
+    }
 }
 
 public extension Exception {
