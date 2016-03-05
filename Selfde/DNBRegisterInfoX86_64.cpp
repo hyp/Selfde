@@ -1298,10 +1298,6 @@ void getRegisterContextX86_64(const x86_thread_state64_t *state, const x86_float
 
     uint8_t *buffer = destination;
     size_t freeBufferSize = *size;
-    if (freeBufferSize < (sizeof(x86_thread_state64_t) + sizeof(x86_avx_state64_t) + sizeof(x86_exception_state64_t))) {
-        assert(false && "The buffer is too small");
-        return;
-    }
 
 #define REGISTER_LOOP(firstRegister, lastRegister, fn, state) \
         for (uint32_t i = (firstRegister), lastI = (lastRegister); i <= lastI; ++i) { \
