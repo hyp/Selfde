@@ -59,6 +59,7 @@ extension CollectionType where Self.Generator.Element == UInt8, Self.Index == In
 
 enum RemoteDebuggingPacket {
     case Payload(String)
+    case BinaryPayload([UInt8])
     case ACK
     case NACK
     case InvalidChecksum
@@ -141,6 +142,10 @@ private func extractPayloadPacket(data: ArraySlice<UInt8>, checkChecksums: Bool 
     }
 
     // Return the payload.
+    if let first = payload.first where first == UInt8(ascii: "X") {
+        // Binary writes need a binary payload.
+        return .BinaryPayload(Array(payload))
+    }
     var str = ""
     str.reserveCapacity(payload.count)
     for byte in payload {

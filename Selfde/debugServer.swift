@@ -28,6 +28,7 @@ enum ResponseResult {
     case None
     case OK
     case Response(String)
+    case BinaryResponse([UInt8])
     case ThreadStopReply
     case StopReplyForThread(ThreadID)
     case Unimplemented
@@ -158,6 +159,69 @@ private func handleMemoryWrite(inout server: DebugServerState, payload: String) 
     }
     guard let bytes = parser.readHexBytes() else {
         return .Invalid("Invalid hex bytes")
+    }
+    guard bytes.count == Int(size) else {
+        return .Error(.E09)
+    }
+    do {
+        try server.debugger.writeMemory(address, bytes: bytes)
+        return .OK
+    } catch {
+        return .Error(.E09)
+    }
+}
+
+// x packets read memory and send it using a binary format.
+private func handleBinaryMemoryRead(inout server: DebugServerState, payload: String) -> ResponseResult {
+    var parser = PacketParser(payload: payload, offset: 1)
+    guard let address = parser.consumeAddress() else {
+        return .Invalid("Missing address")
+    }
+    guard parser.consumeComma() else {
+        return .Invalid("Missing comma")
+    }
+    guard let size = parser.consumeHexUInt() else {
+        return .Invalid("Missing size")
+    }
+    guard size != 0 else {
+        return .OK
+    }
+    do {
+        switch try server.debugger.readMemory(address, size: Int(size)) {
+        case .Bytes(let buffer):
+            return .BinaryResponse(buffer.encodedBinaryData)
+        }
+    } catch {
+        return .Error(.E08)
+    }
+}
+
+// X packets write memory using binary data.
+private func handleBinaryMemoryWrite(inout server: DebugServerState, payload: [UInt8]) -> ResponseResult {
+    // Have to extract the string command.
+    guard let colonPosition = payload.indexOf(UInt8(ascii: ":")) else {
+        return .Invalid("Missing colon")
+    }
+    let bytes = payload.suffixFrom(colonPosition + 1).decodedBinaryData
+    var command = ""
+    for byte in payload[0...colonPosition] {
+        UnicodeScalar(byte).writeTo(&command)
+    }
+    var parser = PacketParser(payload: command, offset: 1)
+    guard let address = parser.consumeAddress() else {
+        return .Invalid("Missing address")
+    }
+    guard parser.consumeComma() else {
+        return .Invalid("Missing comma")
+    }
+    guard let size = parser.consumeHexUInt() else {
+        return .Invalid("Missing size")
+    }
+    guard size != 0 else {
+        return .OK
+    }
+    guard parser.consumeIfPresent(UnicodeScalar(":")) else {
+        return .Invalid("Missing colon")
     }
     guard bytes.count == Int(size) else {
         return .Error(.E09)
@@ -579,6 +643,7 @@ public class DebugServer {
             ("?", handleHaltReasonQuery),
             ("m", handleMemoryRead),
             ("M", handleMemoryWrite),
+            ("x", handleBinaryMemoryRead),
             ("p", handleRegisterRead),
             ("P", handleRegisterWrite),
             ("g", handleGPRegistersRead),
@@ -627,6 +692,13 @@ public class DebugServer {
             }
         }
         return .Unimplemented
+    }
+
+    func handleBinaryPacketPayload(payload: [UInt8]) -> ResponseResult {
+        guard let first = payload.first where first == UInt8(ascii: "X") else {
+            return .Unimplemented
+        }
+        return handleBinaryMemoryWrite(&state, payload: payload)
     }
 
     private func handleStopReplyForThread(threadID: ThreadID) -> ResponseResult {
@@ -705,6 +777,8 @@ public class DebugServer {
             try send("OK")
         case .Response(let r):
             try send(r)
+        case .BinaryResponse(let bytes):
+            try send(bytes)
         case .ThreadStopReply, .StopReplyForThread:
             try sendResponse(handleStopReply(result))
         case .Unimplemented:
@@ -718,11 +792,7 @@ public class DebugServer {
         }
     }
 
-    private func send(payload: String) throws {
-        var output = [UInt8]()
-        output.reserveCapacity(1024)
-        output.append(UInt8(ascii: "$"))
-        output.appendContentsOf(payload.utf8)
+    private func sendOutput(inout output: [UInt8]) throws {
         guard !state.noAckMode else {
             output.appendContentsOf("#00".utf8)
             try connection.write(output[0..<output.count])
@@ -732,6 +802,22 @@ public class DebugServer {
         let checksum = output[1..<output.count].checksum
         output.appendContentsOf("#\([checksum].hexString)".utf8)
         try connection.write(output[0..<output.count])
+    }
+
+    private func send(payload: String) throws {
+        var output = [UInt8]()
+        output.reserveCapacity(1024)
+        output.append(UInt8(ascii: "$"))
+        output.appendContentsOf(payload.utf8)
+        try sendOutput(&output)
+    }
+
+    private func send(payload: [UInt8]) throws {
+        var output = [UInt8]()
+        output.reserveCapacity(payload.count + 4)
+        output.append(UInt8(ascii: "$"))
+        output.appendContentsOf(payload)
+        try sendOutput(&output)
     }
 
     private func sendACK() throws {
@@ -757,31 +843,39 @@ public class DebugServer {
                 packets = parsePackets(&partialData, newData: data, checkChecksums: !state.noAckMode)
             }
             for (i, packet) in packets.enumerate() {
+                let response: ResponseResult
                 switch packet {
                 case .Payload(let payload):
                     if !state.noAckMode {
                         try sendACK()
                     }
-                    switch handlePacketPayload(payload) {
-                    case .Resume(let actions, let defaultAction):
-                        // Save the next packets if there are any (unlikely).
-                        let remainingPackets = packets[(i+1)..<packets.count]
-                        if !remainingPackets.isEmpty {
-                            savedPackets = Array(remainingPackets)
-                        }
-                        return .ResumeThreads(actions: actions, defaultAction: defaultAction)
-                    case .Exit(let response?):
-                        try sendResponse(.Response(response))
-                        fallthrough
-                    case .Exit:
-                        return .Exit
-                    case let result:
-                        try sendResponse(result)
+                    response = handlePacketPayload(payload)
+                case .BinaryPayload(let bytes):
+                    if !state.noAckMode {
+                        try sendACK()
                     }
+                    response = handleBinaryPacketPayload(bytes)
                 case .ACK, .NACK: // Don't resend on NACKs..
-                    break
+                    continue
                 case .InvalidPacket, .InvalidChecksum:
                     try sendNACK()
+                    continue
+                }
+                switch response {
+                case .Resume(let actions, let defaultAction):
+                    // Save the next packets if there are any (unlikely).
+                    let remainingPackets = packets[(i+1)..<packets.count]
+                    if !remainingPackets.isEmpty {
+                        savedPackets = Array(remainingPackets)
+                    }
+                    return .ResumeThreads(actions: actions, defaultAction: defaultAction)
+                case .Exit(let response?):
+                    try sendResponse(.Response(response))
+                    fallthrough
+                case .Exit:
+                    return .Exit
+                case let result:
+                    try sendResponse(result)
                 }
             }
         }

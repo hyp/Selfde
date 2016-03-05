@@ -468,7 +468,7 @@ class SelfdeTests: XCTestCase {
             return result
         }
 
-        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]),
+        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11), (0xA0B, 4), (0x4040, 256)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34]), (0xBeef, [0,7,0xAA,0xBB,1,2,3,4])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]),
             connection: MockConnection()
         )
 
@@ -509,6 +509,17 @@ class SelfdeTests: XCTestCase {
         XCTAssert(server.handlePacketPayload("Ma,").isInvalid)
         XCTAssert(server.handlePacketPayload("M10,4").isInvalid)
         XCTAssert(server.handlePacketPayload("M10,4:a").isInvalid)
+
+        XCTAssertEqual(server.handlePacketPayload("x0,0"), ResponseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("xA0B,4"), ResponseResult.BinaryResponse([0, 1, 2, 3]))
+        guard case ResponseResult.BinaryResponse(let readBytes) = server.handlePacketPayload("x4040,100") else {
+            XCTFail()
+            return
+        }
+        XCTAssertEqual(readBytes.count, 256 + 4)
+        XCTAssertEqual(readBytes.decodedBinaryData, (0..<256).map { UInt8($0) })
+        XCTAssertEqual(server.handleBinaryPacketPayload(Array("X0,0:".utf8)), ResponseResult.OK)
+        XCTAssertEqual(server.handleBinaryPacketPayload(Array("XBEEF,8:".utf8) + [0,7,0xAA,0xBB,1,2,3,4]), ResponseResult.OK)
 
         // Register info
         XCTAssertEqual(server.handlePacketPayload("qRegisterInfo1000"), ResponseResult.Error(.E45))
@@ -719,6 +730,8 @@ func == (lhs: ResponseResult, rhs: ResponseResult) -> Bool {
     case (.StopReplyForThread(let x), .StopReplyForThread(let y)):
         return x == y
     case (.Response(let x), .Response(let y)):
+        return x == y
+    case (.BinaryResponse(let x), .BinaryResponse(let y)):
         return x == y
     default:
         return false
