@@ -6,7 +6,7 @@
 import Darwin.Mach
 
 public func getCurrentThread() throws -> Thread {
-    return MachThread(mach_thread_self())
+    return Thread(mach_thread_self())
 }
 
 public func ==(lhs: Thread, rhs: Thread) -> Bool {
@@ -21,7 +21,7 @@ public func getRegisterContextSize() -> Int {
     return MachMachineThread.registerContextSize
 }
 
-struct MachThread: Thread {
+public struct Thread {
     private var impl: MachMachineThread
     private var thread: mach_port_t {
         return impl.thread
@@ -31,51 +31,51 @@ struct MachThread: Thread {
         impl = MachMachineThread(thread: value)
     }
 
-    func getInstructionPointer() throws -> COpaquePointer {
+    public func getInstructionPointer() throws -> COpaquePointer {
         return try impl.getInstructionPointer()
     }
 
-    func setInstructionPointer(address: COpaquePointer) throws {
+    public func setInstructionPointer(address: COpaquePointer) throws {
         try impl.setInstructionPointer(address)
     }
 
-    func getStackPointer() throws -> COpaquePointer {
+    public func getStackPointer() throws -> COpaquePointer {
         return try impl.getStackPointer()
     }
 
-    func getRegisterValue(id: UInt32, setID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+    public func getRegisterValue(id: UInt32, setID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
         return try impl.getRegisterValue(id, setID: setID, dest: &dest)
     }
 
-    func setRegisterValue(id: UInt32, setID: UInt32, source: ArraySlice<UInt8>) throws {
+    public func setRegisterValue(id: UInt32, setID: UInt32, source: ArraySlice<UInt8>) throws {
         return try impl.setRegisterValue(id, setID: setID, source: source)
     }
 
-    func getRegisterContext(inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+    public func getRegisterContext(inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
         return try impl.getRegisterContext(&dest)
     }
 
-    func setRegisterContext(source: ArraySlice<UInt8>) throws {
+    public func setRegisterContext(source: ArraySlice<UInt8>) throws {
         return try impl.setRegisterContext(source)
     }
 
-    func beginSingleStepMode() throws {
+    public func beginSingleStepMode() throws {
         try impl.setHardwareSingleStep(true)
     }
 
-    func endSingleStepMode() throws {
+    public func endSingleStepMode() throws {
         try impl.setHardwareSingleStep(false)
     }
 
-    func suspend() throws {
+    public func suspend() throws {
         try handleError(thread_suspend(thread))
     }
 
-    func resume() throws {
+    public func resume() throws {
         try handleError(thread_resume(thread))
     }
 
-    func abort() throws {
+    public func abort() throws {
         try handleError(thread_abort(thread))
     }
 
@@ -101,7 +101,7 @@ struct MachThread: Thread {
         return info
     }
 
-    func getRunState() throws -> RunState {
+    public func getRunState() throws -> RunState {
         switch try getBasicInfo().run_state {
         case TH_STATE_RUNNING:
             return .Running
@@ -118,11 +118,11 @@ struct MachThread: Thread {
         }
     }
 
-    func getSuspendCount() throws -> Int {
+    public func getSuspendCount() throws -> Int {
         return Int(try getBasicInfo().suspend_count)
     }
 
-    var threadID: ThreadID {
+    public var threadID: ThreadID {
         do {
             return try getIdentifierInfo().thread_id
         } catch {
@@ -130,7 +130,7 @@ struct MachThread: Thread {
         }
     }
 
-    func getDispatchQueueAddress() throws -> COpaquePointer {
+    public func getDispatchQueueAddress() throws -> COpaquePointer {
         return COpaquePointer(bitPattern: UInt(try getIdentifierInfo().dispatch_qaddr))
     }
 }

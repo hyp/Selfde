@@ -7,7 +7,7 @@ import Darwin.Mach
 import Foundation
 
 /// Implements the Selfde controller for a process running on a Mach kernel.
-class MachController: Controller {
+public class Controller {
     private var state: SelfdeMachControllerState
     private struct BreakpointState {
         let machineState: MachineBreakpointState
@@ -40,16 +40,16 @@ class MachController: Controller {
 
         // Run the thread that will listen for the exceptions.
         try handleError(selfdeStartExceptionThread(&state))
-        print("Initialized controller thread! Controller thread: \(MachThread(state.controllerThread).threadID), message server thread: \(MachThread(state.msgServerThread).threadID)")
+        print("Initialized controller thread! Controller thread: \(Thread(state.controllerThread).threadID), message server thread: \(Thread(state.msgServerThread).threadID)")
     }
 
-    func waitForException() throws -> Exception {
+    public func waitForException() throws -> Exception {
         pthread_mutex_lock(&state.synchronisationMutex)
         while !state.hasCaughtException {
             pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
         }
         let data = UnsafeMutableBufferPointer<mach_exception_data_type_t>(start: state.caughtException.exceptionData, count: Int(state.caughtException.exceptionDataSize))
-        let result = Exception(thread: MachThread(state.caughtException.thread), type: state.caughtException.exceptionType, data: Array(data.map { UInt($0) }))
+        let result = Exception(thread: Thread(state.caughtException.thread), type: state.caughtException.exceptionType, data: Array(data.map { UInt($0) }))
         state.hasCaughtException = false
         free(state.caughtException.exceptionData)
         pthread_mutex_unlock(&state.synchronisationMutex)
@@ -70,7 +70,7 @@ class MachController: Controller {
         try exception.thread.setInstructionPointer(address)
     }
 
-    func getSharedLibraryInfoAddress() throws -> COpaquePointer {
+    public func getSharedLibraryInfoAddress() throws -> COpaquePointer {
         var dyldInfo = task_dyld_info()
         var count = mach_msg_type_number_t(sizeof(task_dyld_info) / sizeof(Int32))
         let error = withUnsafeMutablePointer(&dyldInfo) {
@@ -80,13 +80,13 @@ class MachController: Controller {
         return COpaquePointer(bitPattern: UInt(dyldInfo.all_image_info_addr))
     }
 
-    func suspendThreads() throws {
+    public func suspendThreads() throws {
         for thread in try getThreads() {
             try thread.suspend()
         }
     }
 
-    func resumeThreads() throws {
+    public func resumeThreads() throws {
         for thread in try getThreads() {
             try thread.resume()
         }
@@ -107,7 +107,7 @@ class MachController: Controller {
         return result
     }
 
-    func getThreads() throws -> [Thread] {
+    public func getThreads() throws -> [Thread] {
         var threads = thread_act_port_array_t(nil)
         var count = mach_msg_type_number_t(0)
         try handleError(task_threads(state.task, &threads, &count))
@@ -117,7 +117,7 @@ class MachController: Controller {
             if thread == state.controllerThread || thread == state.msgServerThread {
                 continue;
             }
-            result.append(MachThread(thread))
+            result.append(Thread(thread))
         }
         return result
     }
@@ -128,7 +128,7 @@ class MachController: Controller {
         try handleError(vm_protect(state.task, addr, size, boolean_t(0), getVMProtAll()))
     }
 
-    func installBreakpoint(address: COpaquePointer) throws -> Breakpoint {
+    public func installBreakpoint(address: COpaquePointer) throws -> Breakpoint {
         if let index = breakpoints.indexForKey(address) {
             var bp = breakpoints[index].1
             bp.counter += 1
@@ -147,7 +147,7 @@ class MachController: Controller {
         breakpoint.1.machineState.restoreOriginalInstruction(breakpoint.address)
     }
 
-    func removeBreakpoint(breakpoint: Breakpoint) throws {
+    public func removeBreakpoint(breakpoint: Breakpoint) throws {
         guard let index = breakpoints.indexForKey(breakpoint.address) else {
             throw ControllerError.InvalidBreakpoint
         }
@@ -167,7 +167,7 @@ class MachController: Controller {
         assert(address == breakpoint.address)
     }
 
-    func allocate(size: Int, permissions: MemoryPermissions) throws -> COpaquePointer {
+    public func allocate(size: Int, permissions: MemoryPermissions) throws -> COpaquePointer {
         var address = mach_vm_address_t()
         let allocationSize = mach_vm_size_t(size)
         try handleError(mach_vm_allocate(state.task, &address, allocationSize, 1))
@@ -192,7 +192,7 @@ class MachController: Controller {
         return result
     }
 
-    func deallocate(address: COpaquePointer) throws {
+    public func deallocate(address: COpaquePointer) throws {
         guard let allocation = allocations[address] else {
             throw ControllerError.InvalidAllocation
         }
