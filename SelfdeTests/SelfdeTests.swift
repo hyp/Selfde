@@ -328,9 +328,6 @@ class SelfdeTests: XCTestCase {
             func removeBreakpoint(address: COpaquePointer) throws {
                 
             }
-            
-            func killInferior() throws {
-            }
 
             func getSharedLibraryInfoAddress() throws -> COpaquePointer {
                 return COpaquePointer(bitPattern: 0x1013)

@@ -104,13 +104,8 @@ private func handleHaltReasonQuery(inout server: DebugServerState, payload: Stri
 }
 
 private func handleK(inout server: DebugServerState, payload: String) -> ResponseResult {
-    do {
-        try server.debugger.killInferior()
-        // Exit with code 9 (KILL).
-        return .Exit("X09")
-    } catch {
-        return .Exit(nil)
-    }
+    // Exit with code 9 (KILL).
+    return .Exit("X09")
 }
 
 // D packets detach the server from the process.
