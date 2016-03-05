@@ -170,15 +170,14 @@ struct MachThreadX86_64 {
     func setRegisterContext(source: ArraySlice<UInt8>) throws {
         precondition(source.count == MachThreadX86_64.registerContextSize)
         var state = try getGPRState()
-        var excState = try getEXCState()
         try source.withUnsafeBufferPointer { ptr in
             if hasAVX {
                 var avxState = try getAVXState()
-                setRegisterContextX86_64(&state, nil, &avxState, &excState, ptr.baseAddress, source.count)
+                setRegisterContextX86_64(&state, nil, &avxState, ptr.baseAddress, source.count)
                 try setAVXState(&avxState)
             } else {
                 var fpuState = try getFPUState()
-                setRegisterContextX86_64(&state, &fpuState, nil, &excState, ptr.baseAddress, source.count)
+                setRegisterContextX86_64(&state, &fpuState, nil, ptr.baseAddress, source.count)
                 try setFPUState(&fpuState)
             }
         }

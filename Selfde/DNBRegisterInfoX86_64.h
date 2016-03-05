@@ -34,10 +34,9 @@ bool getFPUValueX86_64(uint32_t registerID, const x86_float_state64_t *fpuState,
 bool setFPUValueX86_64(uint32_t registerID, x86_float_state64_t *fpuState, x86_avx_state64_t *avxState, const uint8_t *source, nub_size_t size);
 
 bool getEXCValueX86_64(uint32_t registerID, const x86_exception_state64_t *state, uint8_t *destination, nub_size_t *size);
-bool setEXCValueX86_64(uint32_t registerID, x86_exception_state64_t *state, const uint8_t *source, nub_size_t size);
 
 void getRegisterContextX86_64(const x86_thread_state64_t *state, const x86_float_state64_t *fpuState, const x86_avx_state64_t *avxState, const x86_exception_state64_t *excState, uint8_t *destination, nub_size_t *size);
-void setRegisterContextX86_64(x86_thread_state64_t *state, x86_float_state64_t *fpuState, x86_avx_state64_t *avxState, x86_exception_state64_t *excState, const uint8_t *source, nub_size_t size);
+void setRegisterContextX86_64(x86_thread_state64_t *state, x86_float_state64_t *fpuState, x86_avx_state64_t *avxState, const uint8_t *source, nub_size_t size);
     
 #ifdef __cplusplus
 }

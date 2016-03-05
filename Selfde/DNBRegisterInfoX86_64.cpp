@@ -1267,31 +1267,6 @@ bool getEXCValueX86_64(uint32_t registerID, const x86_exception_state64_t *state
     return false;
 }
 
-bool setEXCValueX86_64(uint32_t registerID, x86_exception_state64_t *state, const uint8_t *source, nub_size_t size) {
-    switch (registerID) {
-        case exc_trapno:
-            // For some reason LLDB's debug server uses 32 bits for trapno with both the trapno and cpu there.
-            if (size != (sizeof(state->__trapno) + sizeof(state->__cpu))) {
-                assert(false && "Source value isn't of the right size");
-                return false;
-            }
-            memcpy(&(state->__trapno), source, sizeof(state->__trapno));
-            memcpy(&(state->__cpu), source + sizeof(state->__trapno), sizeof(state->__cpu));
-            return true;
-
-#define INTEGER_REG(name, T) case exc_##name: \
-            if (size != sizeof(state->__##name)) { assert(false && "Source value isn't of the right size"); return false; } \
-            memcpy(&(state->__##name), source, sizeof(state->__##name)); \
-            return true;
-
-        INTEGER_REG(err, uint32_t)
-        INTEGER_REG(faultvaddr, uint64_t)
-        default: break;
-#undef INTEGER_REG
-    }
-    return false;
-}
-
 void getRegisterContextX86_64(const x86_thread_state64_t *state, const x86_float_state64_t *fpuState, const x86_avx_state64_t *avxState, const x86_exception_state64_t *excState, uint8_t *destination, nub_size_t *size) {
     assert(fpuState || avxState);
     if (fpuState) { assert(!avxState); }
@@ -1333,7 +1308,7 @@ void getRegisterContextX86_64(const x86_thread_state64_t *state, const x86_float
     *size = size_t(buffer - destination);
 }
 
-void setRegisterContextX86_64(x86_thread_state64_t *state, x86_float_state64_t *fpuState, x86_avx_state64_t *avxState, x86_exception_state64_t *excState, const uint8_t *source, nub_size_t size) {
+void setRegisterContextX86_64(x86_thread_state64_t *state, x86_float_state64_t *fpuState, x86_avx_state64_t *avxState, const uint8_t *source, nub_size_t size) {
     assert(fpuState || avxState);
     if (fpuState) { assert(!avxState); }
     
@@ -1365,11 +1340,9 @@ void setRegisterContextX86_64(x86_thread_state64_t *state, x86_float_state64_t *
     } else {
         REGISTER_LOOP2(fpu_ymm0, fpu_ymm15, setFPUValueX86_64, fpuState, avxState, 32)
     }
-    // EXC
-    REGISTER_LOOP(0, k_num_exc_regs - 1, setEXCValueX86_64, excState, DNBArchImplX86_64::g_exc_registers[i].size)
 #undef REGISTER_LOOP
 #undef REGISTER_LOOP2
-    assert(size == 0);
+    assert(size == sizeof(x86_exception_state64_t));
 }
 
 } // end extern "C"
