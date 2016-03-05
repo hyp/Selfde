@@ -113,6 +113,11 @@ private func handleK(inout server: DebugServerState, payload: String) -> Respons
     }
 }
 
+// D packets detach the server from the process.
+private func handleD(inout server: DebugServerState, payload: String) -> ResponseResult {
+    return .Exit("OK")
+}
+
 // m packets read memory.
 private func handleMemoryRead(inout server: DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
@@ -615,7 +620,8 @@ public class DebugServer {
                 return .None
             }),
             ("qEcho:", handleQEcho),
-            ("k", handleK)
+            ("k", handleK),
+            ("D", handleD)
         ]
     }
 

@@ -616,6 +616,10 @@ class SelfdeTests: XCTestCase {
         }
         XCTAssertEqual(server.handlePacketPayload("?"), ResponseResult.ThreadStopReply)
 
+        // Kill/detach
+        XCTAssertEqual(server.handlePacketPayload("D"), ResponseResult.Exit("OK"))
+        XCTAssertEqual(server.handlePacketPayload("k"), ResponseResult.Exit("X09"))
+
         // Stop replys
         do {
             #if arch(x86_64)
