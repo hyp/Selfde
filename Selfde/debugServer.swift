@@ -22,6 +22,8 @@ enum ErrorResultKind {
     case E55
     case E68
     case E74
+    case E75
+    case E77
 }
 
 enum ResponseResult {
@@ -669,6 +671,8 @@ public class DebugServer {
             ("qProcessInfo", handleQProcessInfo),
             ("QThreadSuffixSupported", handleQThreadSuffixSupported),
             ("QListThreadsInStopReply", handleQListThreadsInStopReply),
+            ("QSaveRegisterState", handleQSaveRegisterState),
+            ("QRestoreRegisterState:", handleQRestoreRegisterState),
             ("QStartNoAckMode", { [unowned self] server, payload in
                 // Send OK before changing the flag.
                 do {

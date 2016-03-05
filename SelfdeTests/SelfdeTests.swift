@@ -468,8 +468,16 @@ class SelfdeTests: XCTestCase {
             return result
         }
 
-        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11), (0xA0B, 4), (0x4040, 256)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34]), (0xBeef, [0,7,0xAA,0xBB,1,2,3,4])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)], expectedRegisterContextReads: [(0x42, registerContext([2, UInt64.max, 0x4091]))], expectedRegisterContextWrites: [(0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0]))]),
-            connection: MockConnection()
+        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [COpaquePointer(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11), (0xA0B, 4), (0x4040, 256)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34]), (0xBeef, [0,7,0xAA,0xBB,1,2,3,4])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)],
+            expectedRegisterContextReads: [
+                (0x42, registerContext([2, UInt64.max, 0x4091])),
+                (0x42, registerContext([2, UInt64.max, 0x4091])),
+                (0x42, registerContext([0,5,11]))
+            ], expectedRegisterContextWrites: [
+                (0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0])),
+                (0x42, registerContext([2, UInt64.max, 0x4091])),
+                (0x42, registerContext([0,5,11]))
+            ]), connection: MockConnection()
         )
 
         XCTAssertEqual(server.handlePacketPayload("foo"), ResponseResult.Unimplemented)
@@ -553,6 +561,18 @@ class SelfdeTests: XCTestCase {
         XCTAssert(server.handlePacketPayload("G;thread:0;").isInvalid)
         XCTAssert(server.handlePacketPayload("G=12;thread:0;").isInvalid)
         XCTAssertEqual(server.handlePacketPayload("GFaF1000000000000ffffffffffffff7f0000000000000000;thread:42;"), ResponseResult.OK)
+
+        XCTAssert(server.handlePacketPayload("QSaveRegisterState").isInvalid)
+        XCTAssertEqual(server.handlePacketPayload("QSaveRegisterState;thread:42"), ResponseResult.Response("1"))
+        XCTAssertEqual(server.handlePacketPayload("QSaveRegisterState;thread:42"), ResponseResult.Response("2"))
+        XCTAssertEqual(server.handlePacketPayload("QRestoreRegisterState:3;thread:42"), ResponseResult.Error(.E77))
+        XCTAssertEqual(server.handlePacketPayload("QRestoreRegisterState:0;thread:42"), ResponseResult.Error(.E77))
+        XCTAssertEqual(server.handlePacketPayload("QRestoreRegisterState:1;thread:42"), ResponseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("QRestoreRegisterState:1;thread:42"), ResponseResult.Error(.E77))
+        XCTAssertEqual(server.handlePacketPayload("QRestoreRegisterState:2;thread:42"), ResponseResult.OK)
+        XCTAssertEqual(server.handlePacketPayload("QRestoreRegisterState:1;thread:42"), ResponseResult.Error(.E77))
+        XCTAssert(server.handlePacketPayload("QRestoreRegisterState:;thread:42").isInvalid)
+        XCTAssert(server.handlePacketPayload("QRestoreRegisterState:348237480297082374820734082;thread:42").isInvalid)
 
         // Thread commands
         XCTAssertEqual(server.handlePacketPayload("qC"), ResponseResult.Response("QCc"))

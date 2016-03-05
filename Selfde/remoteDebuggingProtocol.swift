@@ -233,6 +233,26 @@ struct PacketParser {
         return UInt(truncatingBitPattern: value)
     }
 
+    // Decimal unsigned integer.
+    mutating func consumeUInt() -> UInt? {
+        let startingIndex = index
+        var result: UInt = 0
+        while index < endIndex {
+            let char = payload[index]
+            guard case "0"..."9" = char else {
+                break
+            }
+            var overflow: Bool
+            (result, overflow) = UInt.multiplyWithOverflow(result, 10)
+            (result, overflow) = overflow ? (result, overflow) : UInt.addWithOverflow(result, UInt(char.value - UnicodeScalar("0").value))
+            guard !overflow else {
+                return nil
+            }
+            index = index.successor()
+        }
+        return index != startingIndex ? result : nil
+    }
+
     // Addresses are represented with big endian unsigned integers.
     mutating func consumeAddress() -> COpaquePointer? {
         guard let address = consumeHexUInt() else {

@@ -105,6 +105,8 @@ struct DebuggerRegisterState {
     private let registerSets: [DNBRegisterSetInfo]
     private let registers: [RegisterMapEntry]
     private var valueStorage: [UInt8]
+    private var savedRegisters: [UInt: [UInt8]] = [:]
+    private var saveRegisterID: UInt = 1
 
     init(debugger: Debugger) {
         registerSets = getRegisterSets()
@@ -312,5 +314,49 @@ func handleGPRegistersWrite(inout server: DebugServerState, payload: String) -> 
         return .OK
     } catch {
         return .Error(.E55)
+    }
+}
+
+// QSaveRegisterState
+func handleQSaveRegisterState(inout server: DebugServerState, payload: String) -> ResponseResult {
+    guard let threadID = server.extractThreadID(payload) else {
+        return .Invalid("No thread specified")
+    }
+    do {
+        var storage = [UInt8](count: server.registerState.valueStorage.count, repeatedValue: 0)
+        let bytes = try server.debugger.getRegisterContextForThread(threadID, dest: &storage)
+        assert(storage.count == bytes.count)
+        let saveID = server.registerState.saveRegisterID
+        // Reset back to 1 on overflow.
+        switch UInt.addWithOverflow(server.registerState.saveRegisterID, 1) {
+        case (let newSaveID, false):
+            server.registerState.saveRegisterID = newSaveID
+        case (_, true):
+            server.registerState.saveRegisterID = 1
+        }
+        server.registerState.savedRegisters[saveID] = storage
+        return .Response("\(saveID)")
+    } catch {
+        return .Error(.E75)
+    }
+}
+
+// QRestoreRegisterState save-id
+func handleQRestoreRegisterState(inout server: DebugServerState, payload: String) -> ResponseResult {
+    var parser = PacketParser(payload: payload, offset: "QRestoreRegisterState:".characters.count)
+    guard let saveID = parser.consumeUInt() else {
+        return .Invalid("Invalid save ID")
+    }
+    guard let threadID = server.extractThreadID(payload) else {
+        return .Invalid("No thread specified")
+    }
+    do {
+        guard let savedRegisters = server.registerState.savedRegisters.removeValueForKey(saveID) else {
+            return .Error(.E77)
+        }
+        try server.debugger.setRegisterContextForThread(threadID, source: savedRegisters[0..<savedRegisters.count])
+        return .OK
+    } catch {
+        return .Error(.E77)
     }
 }
