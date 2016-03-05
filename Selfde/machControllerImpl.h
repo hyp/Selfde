@@ -42,6 +42,8 @@ vm_prot_t getVMProtRead();
 vm_prot_t getVMProtWrite();
 vm_prot_t getVMProtExecute();
 
+void selfdeJumpToAddress(const void *address);
+
 #ifdef __cplusplus
 }
 #endif

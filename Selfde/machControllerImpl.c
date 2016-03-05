@@ -141,3 +141,8 @@ vm_prot_t getVMProtWrite() {
 vm_prot_t getVMProtExecute() {
     return VM_PROT_EXECUTE;
 }
+
+void selfdeJumpToAddress(const void *address) {
+    void (*fn)() = address;
+    fn();
+}
