@@ -80,10 +80,6 @@ struct MachThreadX86_64 {
         return state
     }
 
-    private func setEXCState(inout state: EXCState) throws {
-        try setState(&state)
-    }
-
     func setHardwareSingleStep(enabled: Bool) throws {
         var state = try getGPRState()
         let traceBit: UInt64 = 0x100
@@ -129,7 +125,8 @@ struct MachThreadX86_64 {
         case FPUKindX86_64:
             return try setFPURegister(id, source: source)
         case EXCKindX86_64:
-            return try setEXCRegister(id, source: source)
+            // NB: We can't actually save the EXC state as it is get only.
+            fallthrough
         default:
             throw ControllerError.InvalidRegisterSetID
         }
@@ -186,7 +183,7 @@ struct MachThreadX86_64 {
             }
         }
         try setGPRState(&state)
-        try setEXCState(&excState)
+        // NB: We can't actually save the EXC state as it is get only.
     }
 
     private func getGPRRegister(id: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
@@ -269,17 +266,6 @@ struct MachThreadX86_64 {
             throw ControllerError.InvalidRegisterID
         }
         return dest.prefix(size)
-    }
-
-    private func setEXCRegister(id: UInt32, source: ArraySlice<UInt8>) throws {
-        var state = try getEXCState()
-        guard source.withUnsafeBufferPointer({ (ptr: UnsafeBufferPointer<UInt8>) -> Bool in
-            assert(ptr.count == source.count)
-            return setEXCValueX86_64(id, &state, ptr.baseAddress, source.count)
-        }) else {
-            throw ControllerError.InvalidRegisterID
-        }
-        try setEXCState(&state)
     }
 }
 

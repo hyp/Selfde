@@ -100,6 +100,10 @@ class SelfdeTests: XCTestCase {
                 try mainThread.setInstructionPointer(previousIP)
                 count = try mainThread.getSuspendCount()
                 XCTAssertEqual(count, 1)
+                var registerStorage = [UInt8](count: getRegisterContextSize(), repeatedValue: 0)
+                let registerContext = try mainThread.getRegisterContext(&registerStorage)
+                XCTAssertEqual(registerContext.count, registerStorage.count)
+                try mainThread.setRegisterContext(registerContext)
                 try mainThread.resume()
             } catch {
                 XCTFail()
