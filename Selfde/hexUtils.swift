@@ -7,11 +7,11 @@ extension UnicodeScalar {
     var hexValue: UInt32? {
         switch self {
         case "0"..."9":
-            return self.value - UnicodeScalar("0").value
+            return value - UnicodeScalar("0").value
         case "a"..."f":
-            return self.value - UnicodeScalar("a").value + 10
+            return value - UnicodeScalar("a").value + 10
         case "A"..."F":
-            return self.value - UnicodeScalar("A").value + 10
+            return value - UnicodeScalar("A").value + 10
         default:
             return nil
         }
