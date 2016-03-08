@@ -29,8 +29,8 @@ public class Controller {
         var mutex = pthread_mutex_t()
         pthread_mutex_init(&mutex, nil)
 
-        state = SelfdeMachControllerState(task: 0, controllerThread: 0, msgServerThread: 0, exceptionPort: 0, synchronisationCondition: condition, synchronisationMutex: mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
-        try handleError(selfdeInitMachController(&state))
+        let thread = mach_thread_self()
+        state = SelfdeMachControllerState(task: getMachTaskSelf(), controllerThread: thread, msgServerThread: thread, exceptionPort: 0, synchronisationCondition: condition, synchronisationMutex: mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
     }
 
     /// Starts a thread that listens for exceptions like breakpoints for

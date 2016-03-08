@@ -119,12 +119,8 @@ kern_return_t selfdeStartExceptionThread(SelfdeMachControllerState *state) {
     return KERN_SUCCESS;
 }
 
-int selfdeInitMachController(SelfdeMachControllerState *state) {
-    // TODO: check
-    state->task = mach_task_self();
-    state->controllerThread = mach_thread_self();
-    state->msgServerThread = state->controllerThread;
-    return KERN_SUCCESS;
+mach_port_t getMachTaskSelf() {
+    return mach_task_self();
 }
 
 vm_prot_t getVMProtAll() {

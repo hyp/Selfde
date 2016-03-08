@@ -35,7 +35,8 @@ typedef struct SelfdeMachControllerState {
 kern_return_t selfdeCreateExceptionPort(mach_port_t task, mach_port_t *exceptionPort);
 kern_return_t selfdeSetExceptionPortForThread(mach_port_t thread, mach_port_t exceptionPort);
 kern_return_t selfdeStartExceptionThread(SelfdeMachControllerState *state);
-int selfdeInitMachController(SelfdeMachControllerState *state);
+
+mach_port_t getMachTaskSelf();
 
 vm_prot_t getVMProtAll();
 vm_prot_t getVMProtRead();
