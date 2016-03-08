@@ -8,7 +8,7 @@
 
 #include <mach/mach.h>
 #include <pthread.h>
-#include <dispatch/dispatch.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

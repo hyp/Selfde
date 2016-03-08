@@ -6,6 +6,7 @@
 #include "machControllerImpl.h"
 #include <sys/types.h>
 #include <sys/ptrace.h>
+#include <dispatch/dispatch.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <assert.h>
