@@ -101,4 +101,12 @@ public extension Exception {
     public static func stopOnDebuggerAttachmentExceptionForThread(thread: Thread) -> Exception {
         return Exception(thread: thread, type: exception_type_t(EXC_SOFTWARE), data: [UInt(EXC_SOFT_SIGNAL), 0x11])
     }
+
+    // Returns an exception based on self with the stop reason that describes that
+    // the remote debugging "step" action for a thread has beeen completed.
+    public var stopOnDebuggerStepActionCompleted: Exception {
+        assert(isBreakpoint)
+        assert(EXC_I386_SGL == 1)
+        return Exception(thread: thread, type: type, data: [UInt(EXC_I386_SGL), 0])
+    }
 }
