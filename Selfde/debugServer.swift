@@ -5,6 +5,16 @@
 
 import Foundation
 
+public protocol DebugServerLogger: class {
+    func log(message: String)
+
+    func debugServerDidReceiveBinaryPacket(packet: ArraySlice<UInt8>)
+    func debugServerDidReceivePacket(packet: String)
+
+    func debugServerDidSendBinaryPacket(packet: ArraySlice<UInt8>)
+    func debugServerDidSendPacket(packet: String)
+}
+
 enum ErrorResultKind {
     case E01
     case E08
@@ -72,9 +82,12 @@ struct DebugServerState {
     private var threadSuffixSupported = false
     private var listThreadsInStopReply = false
 
-    init(let debugger: Debugger) {
+    private(set) weak var logger: DebugServerLogger?
+
+    init(debugger: Debugger, logger: DebugServerLogger?) {
         self.debugger = debugger
         self.registerState = DebuggerRegisterState(debugger: debugger)
+        self.logger = logger
     }
 }
 
@@ -637,8 +650,8 @@ public class DebugServer {
     private let connection: RemoteDebuggingConnection
     private var handlers: [(String, (inout DebugServerState, String) -> ResponseResult)]
 
-    public init(debugger: Debugger, connection: RemoteDebuggingConnection) {
-        state = DebugServerState(debugger: debugger)
+    public init(debugger: Debugger, connection: RemoteDebuggingConnection, logger: DebugServerLogger? = nil) {
+        state = DebugServerState(debugger: debugger, logger: logger)
         self.connection = connection
         handlers = []
         handlers = [
@@ -744,8 +757,7 @@ public class DebugServer {
         do {
             try state.registerState.emitThreadStopInfoRegistersForThread(threadID, debugger: state.debugger, dest: &result)
         } catch {
-            // TODO: Log
-            print("Failed to emit register info in stop reply")
+            state.logger?.log("Failed to emit register info in stop reply")
         }
         // Mach info.
         if let machInfo = info.machInfo {
@@ -814,6 +826,7 @@ public class DebugServer {
         output.append(UInt8(ascii: "$"))
         output.appendContentsOf(payload.utf8)
         try sendOutput(&output)
+        state.logger?.debugServerDidSendPacket(payload)
     }
 
     private func send(payload: [UInt8]) throws {
@@ -822,6 +835,7 @@ public class DebugServer {
         output.append(UInt8(ascii: "$"))
         output.appendContentsOf(payload)
         try sendOutput(&output)
+        state.logger?.debugServerDidSendBinaryPacket(payload[0..<payload.count])
     }
 
     private func sendACK() throws {
@@ -854,11 +868,13 @@ public class DebugServer {
                         try sendACK()
                     }
                     response = handlePacketPayload(payload)
+                    state.logger?.debugServerDidReceivePacket(payload)
                 case .BinaryPayload(let bytes):
                     if !state.noAckMode {
                         try sendACK()
                     }
                     response = handleBinaryPacketPayload(bytes)
+                    state.logger?.debugServerDidReceiveBinaryPacket(bytes[0..<bytes.count])
                 case .ACK, .NACK: // Don't resend on NACKs..
                     continue
                 case .InvalidPacket, .InvalidChecksum:

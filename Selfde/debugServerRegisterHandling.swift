@@ -238,8 +238,7 @@ func handleRegisterRead(inout server: DebugServerState, payload: String) -> Resp
         return .Invalid("No thread specified")
     }
     guard registerID < server.registerState.registers.count else {
-        // TODO: LOG
-        print(payload, ": Unknown register number requested: ", registerID)
+        server.logger?.log("Unknown register number requested: \(registerID)")
         return .Error(.E47)
     }
     let register = server.registerState.registers[registerID]
@@ -265,8 +264,7 @@ func handleRegisterWrite(inout server: DebugServerState, payload: String) -> Res
         return .Invalid("Missing equals sign")
     }
     guard registerID < server.registerState.registers.count else {
-        // TODO: LOG
-        print(payload, ": Unknown register number requested: ", registerID)
+        server.logger?.log("Unknown register number requested: \(registerID)")
         return .Error(.E47)
     }
     let register = server.registerState.registers[registerID]
