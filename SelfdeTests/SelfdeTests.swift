@@ -28,6 +28,13 @@ class SelfdeTests: XCTestCase {
         let semaphore = dispatch_semaphore_create(0)
 
         runSelfdeController ({ controller in
+            do {
+                try controller.initializeExceptionHandlingForThreads([mainThread])
+            } catch {
+                XCTFail()
+                return
+            }
+
             // Allocate an executable memory region.
             let executableMemory: COpaquePointer
             do {

@@ -31,11 +31,15 @@ public class Controller {
 
         state = SelfdeMachControllerState(task: 0, controllerThread: 0, msgServerThread: 0, exceptionPort: 0, synchronisationCondition: condition, synchronisationMutex: mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
         try handleError(selfdeInitMachController(&state))
+    }
 
+    /// Starts a thread that listens for exceptions like breakpoints for
+    /// the given threads.
+    public func initializeExceptionHandlingForThreads(threads: [Thread]) throws {
         // Create the exception port and make sure it's connected to the threads we're interested in.
         try handleError(selfdeCreateExceptionPort(state.task, &state.exceptionPort))
-        for thread in try getMachThreads() {
-            try handleError(selfdeSetExceptionPortForThread(thread, state.exceptionPort))
+        for thread in threads {
+            try handleError(selfdeSetExceptionPortForThread(thread.thread, state.exceptionPort))
         }
 
         // Run the thread that will listen for the exceptions.
@@ -90,21 +94,6 @@ public class Controller {
         for thread in try getThreads() {
             try thread.resume()
         }
-    }
-
-    private func getMachThreads() throws -> [mach_port_t] {
-        var threads = thread_act_port_array_t(nil)
-        var count = mach_msg_type_number_t(0)
-        try handleError(task_threads(state.task, &threads, &count))
-        var result = [mach_port_t]()
-        for i in 0..<count {
-            let thread = threads[Int(i)]
-            if thread == state.controllerThread || thread == state.msgServerThread {
-                continue;
-            }
-            result.append(thread)
-        }
-        return result
     }
 
     public func getThreads() throws -> [Thread] {

@@ -23,7 +23,7 @@ public func getRegisterContextSize() -> Int {
 
 public struct Thread {
     private var impl: MachMachineThread
-    private var thread: mach_port_t {
+    var thread: mach_port_t {
         return impl.thread
     }
 
