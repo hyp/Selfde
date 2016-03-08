@@ -54,7 +54,6 @@ public class Controller {
 
         // Run the thread that will listen for the exceptions.
         try handleError(selfdeStartExceptionThread(&state))
-        print("Initialized controller thread! Controller thread: \(Thread(state.controllerThread).threadID), message server thread: \(Thread(state.msgServerThread).threadID)")
     }
 
     public func waitForException() throws -> Exception {
