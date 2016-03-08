@@ -33,6 +33,16 @@ public class Controller {
         state = SelfdeMachControllerState(task: getMachTaskSelf(), controllerThread: thread, msgServerThread: thread, exceptionPort: 0, synchronisationCondition: condition, synchronisationMutex: mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
     }
 
+    deinit {
+        if state.msgServerThread != state.controllerThread {
+            if thread_terminate(state.msgServerThread) != KERN_SUCCESS {
+                return
+            }
+        }
+        pthread_mutex_destroy(&state.synchronisationMutex)
+        pthread_cond_destroy(&state.synchronisationCondition)
+    }
+
     /// Starts a thread that listens for exceptions like breakpoints for
     /// the given threads.
     public func initializeExceptionHandlingForThreads(threads: [Thread]) throws {
