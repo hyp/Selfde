@@ -7,11 +7,11 @@ extension UnicodeScalar {
     var hexValue: UInt32? {
         switch self {
         case "0"..."9":
-            return value - UnicodeScalar("0").value
+            return value &- UnicodeScalar("0").value
         case "a"..."f":
-            return value - UnicodeScalar("a").value + 10
+            return value &- UnicodeScalar("a").value &+ UInt32(10)
         case "A"..."F":
-            return value - UnicodeScalar("A").value + 10
+            return value &- UnicodeScalar("A").value &+ UInt32(10)
         default:
             return nil
         }
@@ -27,10 +27,10 @@ extension COpaquePointer {
 private extension UInt8 {
     var hexChar: UnicodeScalar {
         if self < 10 {
-            return UnicodeScalar(UnicodeScalar("0").value + UInt32(self))
+            return UnicodeScalar(UnicodeScalar("0").value &+ UInt32(self))
         } else {
             assert(self < 16)
-            return UnicodeScalar(UnicodeScalar("a").value + UInt32(self - 10))
+            return UnicodeScalar(UnicodeScalar("a").value &+ UInt32(self &- 10))
         }
     }
 }
