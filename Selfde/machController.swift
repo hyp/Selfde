@@ -25,9 +25,9 @@ public class Controller {
     init() throws {
         // Create the synchronisation primitives.
         var condition = pthread_cond_t()
-        pthread_cond_init(&condition, nil)
+        try handlePosixError(pthread_cond_init(&condition, nil))
         var mutex = pthread_mutex_t()
-        pthread_mutex_init(&mutex, nil)
+        try handlePosixError(pthread_mutex_init(&mutex, nil))
 
         let thread = mach_thread_self()
         state = SelfdeMachControllerState(task: getMachTaskSelf(), controllerThread: thread, msgServerThread: thread, exceptionPort: 0, synchronisationCondition: condition, synchronisationMutex: mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
