@@ -61,7 +61,9 @@ func runSelfDebuggerTest() {
             sleep(2)
             dispatch_semaphore_signal(semaphore)
 
-            let exception = try controller.waitForException()
+            guard case .CaughtException(let exception) = try controller.waitForEvent() else {
+                fatalError("Not an exception")
+            }
             if exception.thread != mainThread {
                 fatalError("Exception isn't on the main thread!")
             }
@@ -78,7 +80,9 @@ func runSelfDebuggerTest() {
             try exception.thread.beginSingleStepMode()
             try exception.thread.resume()
 
-            let exception2 = try controller.waitForException()
+            guard case .CaughtException(let exception2) = try controller.waitForEvent() else {
+                fatalError("Not an exception")
+            }
             let hitIP2 = try exception2.thread.getInstructionPointer()
             guard hitIP2 != breakpoint.address else {
                 fatalError("Unexpected hit address!")
@@ -93,7 +97,9 @@ func runSelfDebuggerTest() {
             try exception2.thread.resume()
 
             // Remove the breakpoint and resume the thread.
-            let exception3 = try controller.waitForException()
+            guard case .CaughtException(let exception3) = try controller.waitForEvent() else {
+                fatalError("Not an exception")
+            }
             let hitIP3 = try exception3.thread.getInstructionPointer()
             guard hitIP3 == breakpoint2.address else {
                 fatalError("Unexpected hit address!")
