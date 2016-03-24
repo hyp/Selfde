@@ -16,6 +16,11 @@ public enum ControllerError: ErrorType {
     case InvalidAllocation
 }
 
+public enum ControllerEvent {
+    case CaughtException(Exception)
+    case Interrupted
+}
+
 public typealias ThreadID = UInt64
 
 public struct Breakpoint {

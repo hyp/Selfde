@@ -6,9 +6,22 @@
 import Darwin.Mach
 import Foundation
 
+public struct ControllerInterrupter {
+    private unowned let controller: Controller
+
+    public func sendInterrupt() {
+        controller.notify {
+            controller.hasInterrupt = true
+        }
+    }
+}
+
 /// Implements the Selfde controller for a process running on a Mach kernel.
 public class Controller {
     private var state: SelfdeMachControllerState
+    private var hasInterrupt: Bool = false
+    private var utilityThreadPort: mach_port_t // Can be used for things like listening for remote debugging commands.
+    private var utilityThread: NSThread?
     private struct BreakpointState {
         let machineState: MachineBreakpointState
         let landingAddress: COpaquePointer
@@ -31,6 +44,7 @@ public class Controller {
 
         let thread = mach_thread_self()
         state = SelfdeMachControllerState(task: getMachTaskSelf(), controllerThread: thread, msgServerThread: thread, exceptionPort: 0, synchronisationCondition: condition, synchronisationMutex: mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
+        utilityThreadPort = thread
     }
 
     deinit {
@@ -38,6 +52,12 @@ public class Controller {
             if thread_terminate(state.msgServerThread) != KERN_SUCCESS {
                 return
             }
+        }
+        if let thread = utilityThread where !thread.finished {
+            if thread_terminate(utilityThreadPort) != KERN_SUCCESS {
+                return
+            }
+            utilityThread = nil
         }
         pthread_mutex_destroy(&state.synchronisationMutex)
         pthread_cond_destroy(&state.synchronisationCondition)
@@ -56,18 +76,62 @@ public class Controller {
         try handleError(selfdeStartExceptionThread(&state))
     }
 
-    public func waitForException() throws -> Exception {
+    private func notify(@noescape function: () -> ()) {
         pthread_mutex_lock(&state.synchronisationMutex)
-        while !state.hasCaughtException {
+        function()
+        pthread_cond_signal(&state.synchronisationCondition)
+        pthread_mutex_unlock(&state.synchronisationMutex)
+    }
+
+    public func runUtilityThread(function: (ControllerInterrupter) -> ()) {
+        final class UtilityThread: NSThread {
+            unowned let controller: Controller
+            var initialized = false
+            let function: (ControllerInterrupter) -> ()
+
+            init(controller: Controller, function: (ControllerInterrupter) -> ()) {
+                self.controller = controller
+                self.function = function
+                super.init()
+            }
+
+            override func main() {
+                controller.notify {
+                    controller.utilityThreadPort = mach_thread_self()
+                    initialized = true
+                }
+                function(ControllerInterrupter(controller: controller))
+            }
+        }
+        let thread = UtilityThread(controller: self, function: function)
+        utilityThread = thread
+        thread.start()
+        pthread_mutex_lock(&state.synchronisationMutex)
+        while !thread.initialized {
             pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
+        }
+        pthread_mutex_unlock(&state.synchronisationMutex)
+    }
+
+    public func waitForEvent() throws -> ControllerEvent {
+        pthread_mutex_lock(&state.synchronisationMutex)
+        while !state.hasCaughtException && !hasInterrupt {
+            pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
+        }
+        guard state.hasCaughtException else {
+            assert(hasInterrupt)
+            hasInterrupt = false
+            pthread_mutex_unlock(&state.synchronisationMutex)
+            return .Interrupted
         }
         let data = UnsafeMutableBufferPointer<mach_exception_data_type_t>(start: state.caughtException.exceptionData, count: Int(state.caughtException.exceptionDataSize))
         let result = Exception(thread: Thread(state.caughtException.thread), type: state.caughtException.exceptionType, data: Array(data.map { UInt($0) }))
         state.hasCaughtException = false
+        hasInterrupt = false
         free(state.caughtException.exceptionData)
         pthread_mutex_unlock(&state.synchronisationMutex)
         try handleException(result)
-        return result
+        return .CaughtException(result)
     }
 
     private func handleException(exception: Exception) throws {
@@ -112,7 +176,7 @@ public class Controller {
         var result = [Thread]()
         for i in 0..<count {
             let thread = threads[Int(i)]
-            if thread == state.controllerThread || thread == state.msgServerThread {
+            if thread == state.controllerThread || thread == state.msgServerThread || thread == utilityThreadPort {
                 continue;
             }
             result.append(Thread(thread))

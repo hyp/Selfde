@@ -97,7 +97,11 @@ class SelfdeTests: XCTestCase {
                 previousIP = try mainThread.getInstructionPointer()
                 try mainThread.setInstructionPointer(executableMemory)
                 try mainThread.resume()
-                let exception = try controller.waitForException()
+                let event = try controller.waitForEvent()
+                guard case .CaughtException(let exception) = event else {
+                    XCTFail()
+                    return
+                }
                 XCTAssert(exception.thread == mainThread)
                 let hitIP = try exception.thread.getInstructionPointer()
                 XCTAssertEqual(hitIP, executableMemory)
