@@ -313,6 +313,7 @@ class SelfdeTests: XCTestCase {
             var expectedRegisterWrites: [(ThreadID, UInt32, UInt32, UInt64)]
             var expectedRegisterContextReads: [(ThreadID, [UInt8])]
             var expectedRegisterContextWrites: [(ThreadID, [UInt8])]
+            var interruptCounter = 0
             
             init(expectedSetBreakpoints: [(UInt, Int)] = [], expectedAllocates: [(Int, MemoryPermissions)] = [], expectedDeallocates: [COpaquePointer] = [], expectedMemoryReads: [(UInt, Int)] = [], expectedMemoryWrites: [(UInt, [UInt8])] = [], expectedRegisterReads: [(ThreadID, UInt32, UInt32, UInt64)] = [], expectedRegisterWrites: [(ThreadID, UInt32, UInt32, UInt64)] = [], expectedRegisterContextReads: [(ThreadID, [UInt8])] = [], expectedRegisterContextWrites: [(ThreadID, [UInt8])] = []) {
                 self.expectedSetBreakpoints = expectedSetBreakpoints
@@ -341,6 +342,10 @@ class SelfdeTests: XCTestCase {
             func getStopInfoForThread(threadID: ThreadID) throws -> ThreadStopInfo {
                 XCTFail()
                 return ThreadStopInfo(signalNumber: 0, dispatchQueueAddress: nil, machInfo: nil)
+            }
+
+            func interruptExecution() throws {
+                interruptCounter += 1
             }
 
             func isThreadAlive(threadID: ThreadID) throws -> Bool {
@@ -706,17 +711,31 @@ class SelfdeTests: XCTestCase {
                     return dest.prefix(8)
                 }
             }
-            let server = DebugServer(debugger: StopMockDebugger(expectedThreadStopInfos: [
+            let debugger = StopMockDebugger(expectedThreadStopInfos: [
                 (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: nil, machInfo: nil)),
                 (0x689, ThreadStopInfo(signalNumber: 0x20, dispatchQueueAddress: nil, machInfo: nil)),
                 (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: COpaquePointer(bitPattern: 0xabc), machInfo: ThreadStopInfo.MachInfo(exceptionType: 0x40, exceptionData: [0x2,0xFFFF]))),
                 (0xc, ThreadStopInfo(signalNumber: 0xf0, dispatchQueueAddress: nil, machInfo: nil))
-            ]), writer: MockConnection())
+            ])
+            let server = DebugServer(debugger: debugger, writer: MockConnection())
             XCTAssertEqual(server.handleStopReply(ResponseResult.ThreadStopReply), ResponseResult.Response("T05thread:c;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
             XCTAssertEqual(server.handleStopReply(ResponseResult.StopReplyForThread(0x689)), ResponseResult.Response("T20thread:689;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
             XCTAssertEqual(server.handleStopReply(ResponseResult.ThreadStopReply), ResponseResult.Response("T05thread:c;qaddr:abc;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;metype:40;mecount:2;medata:2;medata:ffff;"))
             XCTAssertEqual(server.handlePacketPayload("QListThreadsInStopReply"), ResponseResult.OK)
             XCTAssertEqual(server.handleStopReply(ResponseResult.ThreadStopReply), ResponseResult.Response("Tf0thread:c;threads:c;thread-pcs:deadbeef;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
+
+            // Interrupt
+            do {
+                XCTAssertEqual(debugger.interruptCounter, 0)
+                var packet = [UInt8(0x03)]
+                guard case .None = try server.processPacketsUntilResumeOrExit(packet[0..<1]) else {
+                    XCTFail()
+                    return
+                }
+                XCTAssertEqual(debugger.interruptCounter, 1)
+            } catch {
+                XCTFail()
+            }
             #endif
         }
     }

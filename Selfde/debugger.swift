@@ -62,6 +62,8 @@ public protocol Debugger: class {
     func attach(processID: Int) throws
     func getSharedLibraryInfoAddress() throws -> COpaquePointer
 
+    func interruptExecution() throws
+
     func getStopInfoForThread(threadID: ThreadID) throws -> ThreadStopInfo
     func isThreadAlive(threadID: ThreadID) throws -> Bool
 
