@@ -892,6 +892,12 @@ public class DebugServer {
                     // Save the next packets if there are any (unlikely).
                     let remainingPackets = packets[(i+1)..<packets.count]
                     if !remainingPackets.isEmpty {
+                        for packet in remainingPackets {
+                            if case .Interrupt = packet {
+                                state.logger?.log("Found an interrupt packet that can't be gracefully handled; assuming an exit.")
+                                return .Exit
+                            }
+                        }
                         savedPackets = Array(remainingPackets)
                     }
                     return .ResumeThreads(actions: actions, defaultAction: defaultAction)
