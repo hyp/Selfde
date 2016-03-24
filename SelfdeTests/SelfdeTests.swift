@@ -159,6 +159,7 @@ class SelfdeTests: XCTestCase {
         XCTAssertEqual(parsePacket("$qHostInfo#--"), RemoteDebuggingPacket.InvalidPacket)
         XCTAssertEqual(parsePacket("+"), RemoteDebuggingPacket.ACK)
         XCTAssertEqual(parsePacket("-"), RemoteDebuggingPacket.NACK)
+        XCTAssertEqual(parsePacket("\u{3}"), RemoteDebuggingPacket.Interrupt)
         XCTAssertEqual(parsePacket("$ha#ha"), RemoteDebuggingPacket.InvalidPacket)
         XCTAssertEqual(parsePacket("$vAttach;d20c#2f"), RemoteDebuggingPacket.Payload("vAttach;d20c"))
     }
@@ -173,15 +174,16 @@ class SelfdeTests: XCTestCase {
         }
         do {
             var partialData = [UInt8]()
-            let data = [UInt8]("+- $#00$test#00+".utf8)
+            let data = [UInt8]("+- $#00$test#00\u{3}+".utf8)
             let packets = parsePackets(&partialData, newData: data[0..<data.count], checkChecksums: false)
             XCTAssert(partialData.isEmpty)
-            XCTAssertEqual(packets.count, 5)
+            XCTAssertEqual(packets.count, 6)
             XCTAssertEqual(packets[0], RemoteDebuggingPacket.ACK)
             XCTAssertEqual(packets[1], RemoteDebuggingPacket.NACK)
             XCTAssertEqual(packets[2], RemoteDebuggingPacket.Payload(""))
             XCTAssertEqual(packets[3], RemoteDebuggingPacket.Payload("test"))
-            XCTAssertEqual(packets[4], RemoteDebuggingPacket.ACK)
+            XCTAssertEqual(packets[4], RemoteDebuggingPacket.Interrupt)
+            XCTAssertEqual(packets[5], RemoteDebuggingPacket.ACK)
         }
         do {
             var partialData = [UInt8]()
@@ -741,7 +743,7 @@ func == (lhs: RemoteDebuggingPacket, rhs: RemoteDebuggingPacket) -> Bool {
     switch (lhs, rhs) {
     case (.Payload(let x), .Payload(let y)):
         return x == y
-    case (.InvalidChecksum, .InvalidChecksum), (.ACK, .ACK), (.NACK, .NACK), (.InvalidPacket, .InvalidPacket):
+    case (.InvalidChecksum, .InvalidChecksum), (.ACK, .ACK), (.NACK, .NACK), (.InvalidPacket, .InvalidPacket), (.Interrupt, .Interrupt):
         return true
     default:
         return false

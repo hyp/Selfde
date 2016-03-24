@@ -875,7 +875,7 @@ public class DebugServer {
                     }
                     response = handleBinaryPacketPayload(bytes)
                     state.logger?.debugServerDidReceiveBinaryPacket(bytes[0..<bytes.count])
-                case .ACK, .NACK: // Don't resend on NACKs..
+                case .ACK, .NACK, .Interrupt: // Don't resend on NACKs..
                     continue
                 case .InvalidPacket, .InvalidChecksum:
                     try sendNACK()

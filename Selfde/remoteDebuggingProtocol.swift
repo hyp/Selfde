@@ -62,6 +62,7 @@ enum RemoteDebuggingPacket {
     case BinaryPayload([UInt8])
     case ACK
     case NACK
+    case Interrupt
     case InvalidChecksum
     case InvalidPacket
 }
@@ -105,6 +106,9 @@ func parsePackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>, checkC
             j = j.advancedBy(3) // The '#' and checksum.
             packets.append(extractPayloadPacket(data[i..<j], checkChecksums: checkChecksums))
             i = j
+        case 0x03:
+            packets.append(.Interrupt)
+            i = i.successor()
         default:
             // Junk byte, Ignore.
             i = i.successor()
