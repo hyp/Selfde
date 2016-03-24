@@ -647,12 +647,12 @@ private func handleVAttach(inout server: DebugServerState, payload: String) -> R
 // LLDB extensions reference: <LLDB repository>/docs/lldb-gdb-remote.txt
 public class DebugServer {
     private var state: DebugServerState
-    private let connection: RemoteDebuggingConnection
+    private let writer: RemoteDebuggingWriter
     private var handlers: [(String, (inout DebugServerState, String) -> ResponseResult)]
 
-    public init(debugger: Debugger, connection: RemoteDebuggingConnection, logger: DebugServerLogger? = nil) {
+    public init(debugger: Debugger, writer: RemoteDebuggingWriter, logger: DebugServerLogger? = nil) {
         state = DebugServerState(debugger: debugger, logger: logger)
-        self.connection = connection
+        self.writer = writer
         handlers = []
         handlers = [
             ("?", handleHaltReasonQuery),
@@ -811,13 +811,13 @@ public class DebugServer {
     private func sendOutput(inout output: [UInt8]) throws {
         guard !state.noAckMode else {
             output.appendContentsOf("#00".utf8)
-            try connection.write(output[0..<output.count])
+            try writer.write(output[0..<output.count])
             return
         }
         // Compute the checksum.
         let checksum = output[1..<output.count].checksum
         output.appendContentsOf("#\([checksum].hexString)".utf8)
-        try connection.write(output[0..<output.count])
+        try writer.write(output[0..<output.count])
     }
 
     private func send(payload: String) throws {
@@ -840,24 +840,26 @@ public class DebugServer {
 
     private func sendACK() throws {
         let data = [UInt8(ascii: "+")]
-        try connection.write(data[0..<data.count])
+        try writer.write(data[0..<data.count])
     }
 
     private func sendNACK() throws {
         let data = [UInt8(ascii: "-")]
-        try connection.write(data[0..<data.count])
+        try writer.write(data[0..<data.count])
     }
 
-    /// Processes incoming packets until a resume or an exit packet like 'c'/'k' is reached.
-    public func processPacketsUntilResumeOrExit() throws -> ProcessResumeAction {
-        while true {
+    /// Processes incoming packets until all of the received data is exhausted or a resume or an exit packet like 'c'/'k' is reached.
+    public func processPacketsUntilResumeOrExit(receivedData: ArraySlice<UInt8>) throws -> ProcessResumeAction {
+        var done = false
+        while !done {
             let packets: [RemoteDebuggingPacket]
             if let savedPackets = self.savedPackets {
                 assert(!savedPackets.isEmpty)
                 packets = savedPackets
                 self.savedPackets = nil
             } else {
-                let data = try connection.read()
+                let data = receivedData
+                done = true
                 packets = parsePackets(&partialData, newData: data, checkChecksums: !state.noAckMode)
             }
             for (i, packet) in packets.enumerate() {
@@ -899,6 +901,7 @@ public class DebugServer {
                 }
             }
         }
+        return .None
     }
 
     public func sendStopReply() throws {

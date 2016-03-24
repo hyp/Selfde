@@ -12,21 +12,23 @@ public enum RemoteDebuggingIOError: ErrorType {
     case WriteError(message: String)
 }
 
-public protocol RemoteDebuggingConnection: class {
+public protocol RemoteDebuggingReader: class {
     // Blocks until some data is read.
     func read() throws -> ArraySlice<UInt8>
+    func close()
+}
+
+public protocol RemoteDebuggingWriter: class {
     func write(data: ArraySlice<UInt8>) throws
     func close()
 }
 
-private final class RemoteDebuggingSocketIO: RemoteDebuggingConnection {
+private final class RemoteDebuggingSocketReader: RemoteDebuggingReader {
     let readStream: Unmanaged<CFReadStream>
-    let writeStream: Unmanaged<CFWriteStream>
     var buffer: [UInt8] = [UInt8](count: 1024, repeatedValue: 0)
 
-    init(readStream: Unmanaged<CFReadStream>, writeStream: Unmanaged<CFWriteStream>) {
+    init(readStream: Unmanaged<CFReadStream>) {
         self.readStream = readStream
-        self.writeStream = writeStream
     }
 
     func read() throws -> ArraySlice<UInt8> {
@@ -37,6 +39,23 @@ private final class RemoteDebuggingSocketIO: RemoteDebuggingConnection {
             throw RemoteDebuggingIOError.ReadError(message: readSize == 0 ? "Reached stream end" : "Stream disconnected")
         }
         return buffer.prefix(readSize)
+    }
+
+    func close() {
+        CFReadStreamClose(readStream.takeUnretainedValue())
+    }
+
+    deinit {
+        close()
+        readStream.release()
+    }
+}
+
+private final class RemoteDebuggingSocketWriter: RemoteDebuggingWriter {
+    let writeStream: Unmanaged<CFWriteStream>
+
+    init(writeStream: Unmanaged<CFWriteStream>) {
+        self.writeStream = writeStream
     }
 
     func write(data: ArraySlice<UInt8>) throws {
@@ -56,18 +75,16 @@ private final class RemoteDebuggingSocketIO: RemoteDebuggingConnection {
     }
 
     func close() {
-        CFReadStreamClose(readStream.takeUnretainedValue())
         CFWriteStreamClose(writeStream.takeUnretainedValue())
     }
 
     deinit {
         close()
-        readStream.release()
         writeStream.release()
     }
 }
 
-public func createRemoteDebuggingSocketConnection(hostAndPort: String) throws -> RemoteDebuggingConnection {
+public func createRemoteDebuggingSocketConnection(hostAndPort: String) throws -> (RemoteDebuggingReader, RemoteDebuggingWriter) {
     guard let (host, port) = parseHostAndPort(hostAndPort) else {
         throw RemoteDebuggingIOError.InvalidHostAndPort
     }
@@ -80,7 +97,7 @@ public func createRemoteDebuggingSocketConnection(hostAndPort: String) throws ->
     guard CFReadStreamOpen(read.takeUnretainedValue()) && CFWriteStreamOpen(write.takeUnretainedValue()) else {
         throw RemoteDebuggingIOError.StreamOpenError
     }
-    return RemoteDebuggingSocketIO(readStream: read, writeStream: write)
+    return (RemoteDebuggingSocketReader(readStream: read), RemoteDebuggingSocketWriter(writeStream: write))
 }
 
 // Parse the host and port that LLDB passes.

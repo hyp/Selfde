@@ -29,6 +29,7 @@ public struct ThreadResumeEntry {
 public enum ProcessResumeAction {
     case ResumeThreads(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction)
     case Exit
+    case None
 }
 
 public struct ThreadStopInfo {

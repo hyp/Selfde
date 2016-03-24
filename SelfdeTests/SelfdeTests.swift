@@ -292,7 +292,7 @@ class SelfdeTests: XCTestCase {
     func testRemoteDebuggingPacketHandling() {
         enum MockError: ErrorType { case NotExpected }
 
-        class MockConnection: RemoteDebuggingConnection {
+        class MockConnection: RemoteDebuggingReader, RemoteDebuggingWriter {
             func read() throws -> ArraySlice<UInt8> {
                 return []
             }
@@ -490,7 +490,7 @@ class SelfdeTests: XCTestCase {
                 (0x42, registerContext([0xF1Fa, UInt64(Int64.max), 0])),
                 (0x42, registerContext([2, UInt64.max, 0x4091])),
                 (0x42, registerContext([0,5,11]))
-            ]), connection: MockConnection()
+            ]), writer: MockConnection()
         )
 
         XCTAssertEqual(server.handlePacketPayload("foo"), ResponseResult.Unimplemented)
@@ -711,7 +711,7 @@ class SelfdeTests: XCTestCase {
                 (0x689, ThreadStopInfo(signalNumber: 0x20, dispatchQueueAddress: nil, machInfo: nil)),
                 (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: COpaquePointer(bitPattern: 0xabc), machInfo: ThreadStopInfo.MachInfo(exceptionType: 0x40, exceptionData: [0x2,0xFFFF]))),
                 (0xc, ThreadStopInfo(signalNumber: 0xf0, dispatchQueueAddress: nil, machInfo: nil))
-            ]), connection: MockConnection())
+            ]), writer: MockConnection())
             XCTAssertEqual(server.handleStopReply(ResponseResult.ThreadStopReply), ResponseResult.Response("T05thread:c;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
             XCTAssertEqual(server.handleStopReply(ResponseResult.StopReplyForThread(0x689)), ResponseResult.Response("T20thread:689;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;"))
             XCTAssertEqual(server.handleStopReply(ResponseResult.ThreadStopReply), ResponseResult.Response("T05thread:c;qaddr:abc;00:7856341278563412;01:7856341278563412;02:7856341278563412;03:7856341278563412;04:7856341278563412;05:7856341278563412;06:7856341278563412;07:7856341278563412;08:7856341278563412;09:7856341278563412;0a:7856341278563412;0b:7856341278563412;0c:7856341278563412;0d:7856341278563412;0e:7856341278563412;0f:7856341278563412;10:7856341278563412;11:7856341278563412;12:7856341278563412;13:7856341278563412;14:7856341278563412;metype:40;mecount:2;medata:2;medata:ffff;"))
