@@ -849,7 +849,7 @@ public class DebugServer {
     }
 
     /// Processes incoming packets until all of the received data is exhausted or a resume or an exit packet like 'c'/'k' is reached.
-    public func processPacketsUntilResumeOrExit(receivedData: ArraySlice<UInt8>) throws -> ProcessResumeAction {
+    public func processPacketsUntilResumeOrExit(receivedData: ArraySlice<UInt8>) throws -> ProcessResumeAction? {
         var done = false
         while !done {
             let packets: [RemoteDebuggingPacket]
@@ -911,7 +911,7 @@ public class DebugServer {
                 }
             }
         }
-        return .None
+        return nil
     }
 
     public func sendStopReply() throws {
