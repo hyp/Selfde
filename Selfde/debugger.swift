@@ -63,6 +63,8 @@ public protocol Debugger: class {
 
     func interruptExecution() throws
 
+    func detach()
+
     func getStopInfoForThread(threadID: ThreadID) throws -> ThreadStopInfo
     func isThreadAlive(threadID: ThreadID) throws -> Bool
 

@@ -895,6 +895,7 @@ public class DebugServer {
                         for packet in remainingPackets {
                             if case .Interrupt = packet {
                                 state.logger?.log("Found an interrupt packet that can't be gracefully handled; assuming an exit.")
+                                state.debugger.detach()
                                 return .Exit
                             }
                         }
@@ -902,9 +903,11 @@ public class DebugServer {
                     }
                     return .ResumeThreads(actions: actions, defaultAction: defaultAction)
                 case .Exit(let response?):
+                    state.debugger.detach()
                     try sendResponse(.Response(response))
-                    fallthrough
+                    return .Exit
                 case .Exit:
+                    state.debugger.detach()
                     return .Exit
                 case let result:
                     try sendResponse(result)

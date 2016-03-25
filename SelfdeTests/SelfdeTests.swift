@@ -348,6 +348,9 @@ class SelfdeTests: XCTestCase {
                 interruptCounter += 1
             }
 
+            func detach() {
+            }
+
             func isThreadAlive(threadID: ThreadID) throws -> Bool {
                 return threadID == 0x405
             }
