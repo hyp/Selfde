@@ -9,10 +9,8 @@ import Foundation
 public struct ControllerInterrupter {
     private unowned let controller: Controller
 
-    public func sendInterrupt() {
-        controller.notify {
-            controller.hasInterrupt = true
-        }
+    public func sendInterrupt(@noescape function: () -> ()) {
+        controller.interrupt(function)
     }
 }
 
@@ -76,8 +74,9 @@ public class Controller {
         try handleError(selfdeStartExceptionThread(&state))
     }
 
-    private func notify(@noescape function: () -> ()) {
+    private func interrupt(@noescape function: () -> ()) {
         pthread_mutex_lock(&state.synchronisationMutex)
+        hasInterrupt = true
         function()
         pthread_cond_signal(&state.synchronisationCondition)
         pthread_mutex_unlock(&state.synchronisationMutex)
@@ -86,7 +85,6 @@ public class Controller {
     public func runUtilityThread(function: (ControllerInterrupter) -> ()) {
         final class UtilityThread: NSThread {
             unowned let controller: Controller
-            var initialized = false
             let function: (ControllerInterrupter) -> ()
 
             init(controller: Controller, function: (ControllerInterrupter) -> ()) {
@@ -96,30 +94,32 @@ public class Controller {
             }
 
             override func main() {
-                controller.notify {
+                controller.interrupt {
                     controller.utilityThreadPort = mach_thread_self()
-                    initialized = true
                 }
                 function(ControllerInterrupter(controller: controller))
             }
         }
         let thread = UtilityThread(controller: self, function: function)
         utilityThread = thread
+        assert(hasInterrupt == false)
         thread.start()
         pthread_mutex_lock(&state.synchronisationMutex)
-        while !thread.initialized {
+        while !hasInterrupt {
             pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
         }
+        hasInterrupt = false
         pthread_mutex_unlock(&state.synchronisationMutex)
     }
 
-    public func waitForEvent() throws -> ControllerEvent {
+    public func waitForEvent(interruptHandler interruptHandler: (() -> ())? = nil) throws -> ControllerEvent {
         pthread_mutex_lock(&state.synchronisationMutex)
         while !state.hasCaughtException && !hasInterrupt {
             pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
         }
         guard state.hasCaughtException else {
             assert(hasInterrupt)
+            interruptHandler?()
             hasInterrupt = false
             pthread_mutex_unlock(&state.synchronisationMutex)
             return .Interrupted
