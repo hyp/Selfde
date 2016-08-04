@@ -308,12 +308,12 @@ class SelfdeTests: XCTestCase {
             XCTAssertEqual(result[1].2, nil)
         }
         do {
-            let entries = [ThreadResumeEntry(thread: .any, action: .stop, address: OpaquePointer(bitPattern: 0x20)), ThreadResumeEntry(thread: .id(400), action: .step, address: nil)]
+            let entries = [ThreadResumeEntry(thread: .any, action: .stop, address: Address(bitPattern: 0x20)), ThreadResumeEntry(thread: .id(400), action: .step, address: nil)]
             let result = extractResumeActionsForThreads(threads, primaryThread: primaryThread, entries: entries, defaultAction: .stop)
             XCTAssertEqual(result.count, 2)
             XCTAssertEqual(result[0].0, 2)
             XCTAssertEqual(result[0].1, ThreadResumeAction.stop)
-            XCTAssertEqual(result[0].2, OpaquePointer(bitPattern: 0x20))
+            XCTAssertEqual(result[0].2, Address(bitPattern: 0x20))
             XCTAssertEqual(result[1].0, 400)
             XCTAssertEqual(result[1].1, ThreadResumeAction.step)
             XCTAssertEqual(result[1].2, nil)
@@ -337,7 +337,7 @@ class SelfdeTests: XCTestCase {
             var expectedSetBreakpoints: [(UInt, Int)] = []
             var removeBreakpoint: [UInt] = []
             var expectedAllocates: [(Int, MemoryPermissions)]
-            var expectedDeallocates: [OpaquePointer]
+            var expectedDeallocates: [Address]
             var expectedMemoryReads: [(UInt, Int)]
             var expectedMemoryWrites:[(UInt, [UInt8])]
             var expectedRegisterReads: [(ThreadID, UInt32, UInt32, UInt64)]
@@ -346,7 +346,7 @@ class SelfdeTests: XCTestCase {
             var expectedRegisterContextWrites: [(ThreadID, [UInt8])]
             var interruptCounter = 0
             
-            init(expectedSetBreakpoints: [(UInt, Int)] = [], expectedAllocates: [(Int, MemoryPermissions)] = [], expectedDeallocates: [OpaquePointer] = [], expectedMemoryReads: [(UInt, Int)] = [], expectedMemoryWrites: [(UInt, [UInt8])] = [], expectedRegisterReads: [(ThreadID, UInt32, UInt32, UInt64)] = [], expectedRegisterWrites: [(ThreadID, UInt32, UInt32, UInt64)] = [], expectedRegisterContextReads: [(ThreadID, [UInt8])] = [], expectedRegisterContextWrites: [(ThreadID, [UInt8])] = []) {
+            init(expectedSetBreakpoints: [(UInt, Int)] = [], expectedAllocates: [(Int, MemoryPermissions)] = [], expectedDeallocates: [Address] = [], expectedMemoryReads: [(UInt, Int)] = [], expectedMemoryWrites: [(UInt, [UInt8])] = [], expectedRegisterReads: [(ThreadID, UInt32, UInt32, UInt64)] = [], expectedRegisterWrites: [(ThreadID, UInt32, UInt32, UInt64)] = [], expectedRegisterContextReads: [(ThreadID, [UInt8])] = [], expectedRegisterContextWrites: [(ThreadID, [UInt8])] = []) {
                 self.expectedSetBreakpoints = expectedSetBreakpoints
                 self.expectedAllocates = expectedAllocates
                 self.expectedDeallocates = expectedDeallocates
@@ -386,34 +386,34 @@ class SelfdeTests: XCTestCase {
                 return threadID == 0x405
             }
 
-            func setBreakpoint(_ address: OpaquePointer, byteSize: Int) throws {
+            func setBreakpoint(_ address: Address, byteSize: Int) throws {
                 guard let bp = expectedSetBreakpoints.first else {
                     throw MockError.notExpected
                 }
-                XCTAssertEqual(OpaquePointer(bitPattern: bp.0), address)
+                XCTAssertEqual(Address(bitPattern: bp.0), address)
                 XCTAssertEqual(bp.1, byteSize)
                 expectedSetBreakpoints.removeFirst()
             }
             
-            func removeBreakpoint(_ address: OpaquePointer) throws {
+            func removeBreakpoint(_ address: Address) throws {
                 
             }
 
-            func getSharedLibraryInfoAddress() throws -> OpaquePointer {
-                return OpaquePointer(bitPattern: 0x1013)!
+            func getSharedLibraryInfoAddress() throws -> Address {
+                return Address(bitPattern: 0x1013)
             }
 
-            func allocate(_ size: Int, permissions: MemoryPermissions) throws -> OpaquePointer {
+            func allocate(_ size: Int, permissions: MemoryPermissions) throws -> Address {
                 guard let value = expectedAllocates.first else {
                     throw MockError.notExpected
                 }
                 XCTAssertEqual(value.0, size)
                 XCTAssertEqual(value.1, permissions)
                 expectedAllocates.removeFirst()
-                return OpaquePointer(bitPattern: 0xADBEEF)!
+                return Address(bitPattern: 0xADBEEF)
             }
             
-            func deallocate(_ address: OpaquePointer) throws {
+            func deallocate(_ address: Address) throws {
                 guard let value = expectedDeallocates.first else {
                     throw MockError.notExpected
                 }
@@ -427,28 +427,28 @@ class SelfdeTests: XCTestCase {
                 return result
             }()
 
-            func readMemory(_ address: OpaquePointer, size: Int) throws -> MemoryReadResult {
+            func readMemory(_ address: Address, size: Int) throws -> MemoryReadResult {
                 guard let value = expectedMemoryReads.first else {
                     throw MockError.notExpected
                 }
                 expectedMemoryReads.removeFirst()
-                XCTAssertEqual(OpaquePointer(bitPattern: value.0), address)
+                XCTAssertEqual(Address(bitPattern: value.0), address)
                 XCTAssertEqual(value.1, size)
                 return MemoryReadResult.bytes(UnsafeBufferPointer<UInt8>(start: UnsafePointer<UInt8>(bytes), count: size))
             }
             
-            func writeMemory(_ address: OpaquePointer, bytes: [UInt8]) throws {
+            func writeMemory(_ address: Address, bytes: [UInt8]) throws {
                 guard let value = expectedMemoryWrites.first else {
                     throw MockError.notExpected
                 }
                 expectedMemoryWrites.removeFirst()
-                XCTAssertEqual(OpaquePointer(bitPattern: value.0), address)
+                XCTAssertEqual(Address(bitPattern: value.0), address)
                 XCTAssertEqual(value.1.count, bytes.count)
                 XCTAssert(zip(value.1, bytes).reduce(true) { $0 ? $1.0 == $1.1 : false })
             }
 
-            func getIPRegisterValueForThread(_ threadID: ThreadID) throws -> OpaquePointer {
-                return OpaquePointer(bitPattern: 0xdeadbeef)!
+            func getIPRegisterValueForThread(_ threadID: ThreadID) throws -> Address {
+                return Address(bitPattern: 0xdeadbeef)
             }
 
             #if arch(x86_64)
@@ -520,7 +520,7 @@ class SelfdeTests: XCTestCase {
             return result
         }
 
-        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [OpaquePointer(bitPattern: 0xadbeef)!], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11), (0xA0B, 4), (0x4040, 256)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34]), (0xBeef, [0,7,0xAA,0xBB,1,2,3,4])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)],
+        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [Address(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11), (0xA0B, 4), (0x4040, 256)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34]), (0xBeef, [0,7,0xAA,0xBB,1,2,3,4])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)],
             expectedRegisterContextReads: [
                 (0x42, registerContext([2, UInt64.max, 0x4091])),
                 (0x42, registerContext([2, UInt64.max, 0x4091])),
@@ -650,13 +650,13 @@ class SelfdeTests: XCTestCase {
 
         // Continue/step
         XCTAssertEqual(server.handlePacketPayload("c"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .all, action: .`continue`, address: nil)], defaultAction: .`continue`))
-        XCTAssertEqual(server.handlePacketPayload("c0"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .all, action: .`continue`, address: OpaquePointer(bitPattern: 0))], defaultAction: .`continue`))
-        XCTAssertEqual(server.handlePacketPayload("c4000"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .all, action: .`continue`, address: OpaquePointer(bitPattern: 0x4000))], defaultAction: .`continue`))
+        XCTAssertEqual(server.handlePacketPayload("c0"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .all, action: .`continue`, address: Address(bitPattern: 0))], defaultAction: .`continue`))
+        XCTAssertEqual(server.handlePacketPayload("c4000"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .all, action: .`continue`, address: Address(bitPattern: 0x4000))], defaultAction: .`continue`))
         XCTAssertEqual(server.handlePacketPayload("Hc40"), ResponseResult.ok)
         XCTAssertEqual(server.handlePacketPayload("c"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .id(0x40), action: .`continue`, address: nil)], defaultAction: .`continue`))
         XCTAssert(server.handlePacketPayload("c=").isInvalid)
         XCTAssertEqual(server.handlePacketPayload("s"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .id(0x40), action: .step, address: nil)], defaultAction: .stop))
-        XCTAssertEqual(server.handlePacketPayload("s123456789ab"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .id(0x40), action: .step, address: OpaquePointer(bitPattern: 0x123456789ab))], defaultAction: .stop))
+        XCTAssertEqual(server.handlePacketPayload("s123456789ab"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .id(0x40), action: .step, address: Address(bitPattern: 0x123456789ab))], defaultAction: .stop))
         XCTAssertEqual(server.handlePacketPayload("Hc0"), ResponseResult.ok)
         XCTAssertEqual(server.handlePacketPayload("s"), ResponseResult.resume(actions: [ThreadResumeEntry(thread: .id(0xc), action: .step, address: nil)], defaultAction: .stop))
         XCTAssertEqual(server.handlePacketPayload("Hc-1"), ResponseResult.ok)
@@ -748,7 +748,7 @@ class SelfdeTests: XCTestCase {
             let debugger = StopMockDebugger(expectedThreadStopInfos: [
                 (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: nil, machInfo: nil)),
                 (0x689, ThreadStopInfo(signalNumber: 0x20, dispatchQueueAddress: nil, machInfo: nil)),
-                (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: OpaquePointer(bitPattern: 0xabc), machInfo: ThreadStopInfo.MachInfo(exceptionType: 0x40, exceptionData: [0x2,0xFFFF]))),
+                (0xc, ThreadStopInfo(signalNumber: 5, dispatchQueueAddress: Address(bitPattern: 0xabc), machInfo: ThreadStopInfo.MachInfo(exceptionType: 0x40, exceptionData: [0x2,0xFFFF]))),
                 (0xc, ThreadStopInfo(signalNumber: 0xf0, dispatchQueueAddress: nil, machInfo: nil))
             ])
             let server = DebugServer(debugger: debugger, writer: MockConnection())

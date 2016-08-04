@@ -7,6 +7,19 @@ public enum MemoryReadResult {
     case bytes(UnsafeBufferPointer<UInt8>)
 }
 
+public struct Address: Equatable {
+	// In-process, thus same width.
+	public let bitPattern: UInt
+
+	public init(bitPattern: UInt) {
+		self.bitPattern = bitPattern
+	}
+}
+
+public func == (lhs: Address, rhs: Address) -> Bool {
+	return lhs.bitPattern == rhs.bitPattern
+}
+
 public enum ThreadReference {
     case id(ThreadID) // NNN
     case any          // 0
@@ -23,7 +36,7 @@ public enum ThreadResumeAction: Int {
 public struct ThreadResumeEntry {
     public let thread: ThreadReference
     public let action: ThreadResumeAction
-    public let address: OpaquePointer?
+    public let address: Address?
 }
 
 public enum ProcessResumeAction {
@@ -33,7 +46,7 @@ public enum ProcessResumeAction {
 
 public struct ThreadStopInfo {
     public let signalNumber: UInt8
-    public let dispatchQueueAddress: OpaquePointer?
+    public let dispatchQueueAddress: Address?
     public struct MachInfo {
         let exceptionType: Int
         let exceptionData: [UInt]
@@ -45,7 +58,7 @@ public struct ThreadStopInfo {
     }
     public let machInfo: MachInfo?
 
-    public init(signalNumber: UInt8, dispatchQueueAddress: OpaquePointer?, machInfo: MachInfo?) {
+    public init(signalNumber: UInt8, dispatchQueueAddress: Address?, machInfo: MachInfo?) {
         self.signalNumber = signalNumber
         self.dispatchQueueAddress = dispatchQueueAddress
         self.machInfo = machInfo
@@ -59,7 +72,7 @@ public protocol Debugger: class {
     var threads: [ThreadID] { get }
 
     func attach(_ processID: Int) throws
-    func getSharedLibraryInfoAddress() throws -> OpaquePointer
+    func getSharedLibraryInfoAddress() throws -> Address
 
     func interruptExecution() throws
 
@@ -68,11 +81,11 @@ public protocol Debugger: class {
     func getStopInfoForThread(_ threadID: ThreadID) throws -> ThreadStopInfo
     func isThreadAlive(_ threadID: ThreadID) throws -> Bool
 
-    func setBreakpoint(_ address: OpaquePointer, byteSize: Int) throws
-    func removeBreakpoint(_ address: OpaquePointer) throws
+    func setBreakpoint(_ address: Address, byteSize: Int) throws
+    func removeBreakpoint(_ address: Address) throws
 
     // Instruction Pointer/Program counter.
-    func getIPRegisterValueForThread(_ threadID: ThreadID) throws -> OpaquePointer
+    func getIPRegisterValueForThread(_ threadID: ThreadID) throws -> Address
 
     func getRegisterValueForThread(_ threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, dest: inout [UInt8]) throws -> ArraySlice<UInt8>
     func setRegisterValueForThread(_ threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, source: ArraySlice<UInt8>) throws
@@ -80,9 +93,9 @@ public protocol Debugger: class {
     func getRegisterContextForThread(_ threadID: ThreadID, dest: inout [UInt8]) throws -> ArraySlice<UInt8>
     func setRegisterContextForThread(_ threadID: ThreadID, source: ArraySlice<UInt8>) throws
 
-    func allocate(_ size: Int, permissions: MemoryPermissions) throws -> OpaquePointer
-    func deallocate(_ address: OpaquePointer) throws
+    func allocate(_ size: Int, permissions: MemoryPermissions) throws -> Address
+    func deallocate(_ address: Address) throws
 
-    func readMemory(_ address: OpaquePointer, size: Int) throws -> MemoryReadResult
-    func writeMemory(_ address: OpaquePointer, bytes: [UInt8]) throws
+    func readMemory(_ address: Address, size: Int) throws -> MemoryReadResult
+    func writeMemory(_ address: Address, bytes: [UInt8]) throws
 }

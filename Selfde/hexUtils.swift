@@ -18,9 +18,9 @@ extension UnicodeScalar {
     }
 }
 
-extension OpaquePointer {
+extension Address {
     var bigEndianHexString: String {
-        return String(unsafeBitCast(self, to: UInt.self), radix: 16, uppercase: false)
+        return String(self.bitPattern, radix: 16, uppercase: false)
     }
 }
 

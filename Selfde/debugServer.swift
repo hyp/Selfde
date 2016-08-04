@@ -282,7 +282,7 @@ private func handleAllocate(_ server: inout DebugServerState, payload: String) -
 // _m packets deallocate memory that was allocated using _M.
 private func handleDeallocate(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 2)
-    guard let address: OpaquePointer = parser.consumeAddress() else {
+    guard let address = parser.consumeAddress() else {
         return .error(.e54)
     }
     do {
@@ -422,7 +422,7 @@ private func handleVCont(_ server: inout DebugServerState, payload: String) -> R
 // c [addr]
 private func handleContinue(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    let address: OpaquePointer?
+    let address: Address?
     if parser.hasContents {
         guard let addr = parser.consumeAddress() else {
             return .invalid("Invalid address")
@@ -438,7 +438,7 @@ private func handleContinue(_ server: inout DebugServerState, payload: String) -
 // s [addr]
 private func handleStep(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    let address: OpaquePointer?
+    let address: Address?
     if parser.hasContents {
         guard let addr = parser.consumeAddress() else {
             return .invalid("Invalid address")

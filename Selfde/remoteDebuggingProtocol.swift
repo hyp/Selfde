@@ -258,11 +258,11 @@ struct PacketParser {
     }
 
     // Addresses are represented with big endian unsigned integers.
-    mutating func consumeAddress() -> OpaquePointer? {
+    mutating func consumeAddress() -> Address? {
         guard let address = consumeHexUInt() else {
             return nil
         }
-        return OpaquePointer(bitPattern: address)
+        return Address(bitPattern: address)
     }
 
     private mutating func readHexBytes(_ endIndex: String.UnicodeScalarView.Index) -> [UInt8]? {
