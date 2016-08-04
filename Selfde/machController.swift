@@ -249,9 +249,9 @@ public class Controller {
             mach_vm_deallocate(state.task, address, allocationSize)
             throw error
         }
-        let result = OpaquePointer(bitPattern: UInt(address))
-        allocations[result!] = AllocationState(address: address, size: allocationSize)
-        return result!
+        let result = OpaquePointer(bitPattern: UInt(address))!
+        allocations[result] = AllocationState(address: address, size: allocationSize)
+        return result
     }
 
     public func deallocate(_ address: OpaquePointer) throws {
