@@ -94,7 +94,7 @@ public struct Thread {
 
     private func getIdentifierInfo() throws -> thread_identifier_info {
         var info = thread_identifier_info()
-        var size = mach_msg_type_number_t(sizeofValue(info) / sizeof(integer_t))
+        var size = mach_msg_type_number_t(sizeofValue(info) / sizeof(integer_t.self))
         try handleError(withUnsafeMutablePointer(&info) { pointer in
             thread_info(thread, thread_flavor_t(THREAD_IDENTIFIER_INFO), thread_info_t(pointer), &size)
         })

@@ -149,7 +149,7 @@ public class Controller {
 
     public func getSharedLibraryInfoAddress() throws -> OpaquePointer {
         var dyldInfo = task_dyld_info()
-        var count = mach_msg_type_number_t(sizeof(task_dyld_info) / sizeof(Int32))
+        var count = mach_msg_type_number_t(sizeof(task_dyld_info.self) / sizeof(Int32.self))
         let error = withUnsafeMutablePointer(&dyldInfo) {
             task_info(self.state.task, task_flavor_t(TASK_DYLD_INFO), UnsafeMutablePointer<integer_t>($0), &count)
         }

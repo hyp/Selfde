@@ -18,7 +18,7 @@ private extension OpaquePointer {
 }
 
 private func getStateCount<T>(_ state: T) -> mach_msg_type_number_t {
-    return mach_msg_type_number_t(sizeofValue(state) / sizeof(Int32))
+    return mach_msg_type_number_t(sizeofValue(state) / sizeof(Int32.self))
 }
 
 typealias MachMachineThread = MachThreadX86_64

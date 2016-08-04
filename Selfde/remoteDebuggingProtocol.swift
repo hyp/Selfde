@@ -219,7 +219,7 @@ struct PacketParser {
     // Big endian unsigned 64 bit integer (most significant bytes come first).
     mutating func consumeHexUInt64() -> UInt64? {
         let (value, characterCount) = parseHexUInt64()
-        guard characterCount != 0 && characterCount <= (sizeof(UInt64) * 2) else {
+        guard characterCount != 0 && characterCount <= (sizeof(UInt64.self) * 2) else {
             // Empty string or too many hex digits.
             return nil
         }
@@ -229,7 +229,7 @@ struct PacketParser {
     // Big endian unsigned integer (most significant bytes come first).
     mutating func consumeHexUInt() -> UInt? {
         let (value, characterCount) = parseHexUInt64()
-        guard characterCount != 0 && characterCount <= (sizeof(UInt) * 2) else {
+        guard characterCount != 0 && characterCount <= (sizeof(UInt.self) * 2) else {
             // Empty string or too many hex digits.
             return nil
         }

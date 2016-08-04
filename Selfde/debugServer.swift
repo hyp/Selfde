@@ -551,9 +551,9 @@ private func getHostProcessInfo(isHostInfo: Bool = true) -> String {
     #endif
     result.write("endian:little;") // FIXME: Any big endian targets?
     if isHostInfo {
-        result.write("ptrsize:\(sizeof(OpaquePointer));")
+        result.write("ptrsize:\(sizeof(OpaquePointer.self));")
     } else {
-        result.write("ptrsize:\(String(sizeof(OpaquePointer), radix: 16, uppercase: false))")
+        result.write("ptrsize:\(String(sizeof(OpaquePointer.self), radix: 16, uppercase: false))")
     }
     return result
 }
