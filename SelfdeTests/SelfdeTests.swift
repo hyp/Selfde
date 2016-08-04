@@ -54,7 +54,7 @@ class SelfdeTests: XCTestCase {
             // Install a breakpoint in that memory.
             do {
                 let bp0 = try controller.installBreakpoint(at: executableMemory)
-				let bp1 = try controller.installBreakpoint(at: executableMemory)
+                let bp1 = try controller.installBreakpoint(at: executableMemory)
                 XCTAssertEqual(bp0.address, bp1.address)
                 try controller.removeBreakpoint(bp0)
             } catch {
@@ -423,7 +423,7 @@ class SelfdeTests: XCTestCase {
             
             let bytes: UnsafeMutablePointer<UInt8> = {
                 let result = UnsafeMutablePointer<UInt8>.allocate(capacity: 256)
-				result.initialize(from: (0..<256).map { UInt8($0) })
+                result.initialize(from: (0..<256).map { UInt8($0) })
                 return result
             }()
 

@@ -8,16 +8,16 @@ public enum MemoryReadResult {
 }
 
 public struct Address: Equatable {
-	// In-process, thus same width.
-	public let bitPattern: UInt
+    // In-process, thus same width.
+    public let bitPattern: UInt
 
-	public init(bitPattern: UInt) {
-		self.bitPattern = bitPattern
-	}
+    public init(bitPattern: UInt) {
+        self.bitPattern = bitPattern
+    }
 }
 
 public func == (lhs: Address, rhs: Address) -> Bool {
-	return lhs.bitPattern == rhs.bitPattern
+    return lhs.bitPattern == rhs.bitPattern
 }
 
 public enum ThreadReference {

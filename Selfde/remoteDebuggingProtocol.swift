@@ -280,10 +280,10 @@ struct PacketParser {
     }
 
     mutating func readHexBytes() -> [UInt8]? {
-		return readHexBytes(upTo: endIndex)
+        return readHexBytes(upTo: endIndex)
     }
 
     mutating func readHexBytes(size: Int) -> [UInt8]? {
-		return readHexBytes(upTo: payload.index(index, offsetBy: size * 2))
+        return readHexBytes(upTo: payload.index(index, offsetBy: size * 2))
     }
 }
