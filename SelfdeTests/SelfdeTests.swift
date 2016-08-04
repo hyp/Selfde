@@ -534,7 +534,7 @@ class SelfdeTests: XCTestCase {
 
         XCTAssertEqual(server.handlePacketPayload("foo"), ResponseResult.unimplemented)
         XCTAssertEqual(server.handlePacketPayload(""), ResponseResult.unimplemented)
-        XCTAssertEqual("\(ErrorResultKind.e08)", "e08")
+        XCTAssertEqual("\(ErrorResultKind.e08)".uppercased(), "E08")
 
         // Breakpoints
         XCTAssertEqual(server.handlePacketPayload("Z0,ABA,1"), ResponseResult.ok)

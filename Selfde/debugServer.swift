@@ -802,7 +802,7 @@ public class DebugServer {
         case .invalid:
             try send("E03")
         case .error(let kind):
-            try send("\(kind)")
+            try send("\(kind)".uppercased())
         case .resume, .exit:
             assertionFailure("Invalid response")
         }
