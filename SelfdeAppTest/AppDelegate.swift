@@ -10,7 +10,7 @@ import Selfde
 class AppDelegate: NSObject, NSApplicationDelegate {
     @IBOutlet weak var window: NSWindow!
 
-    func applicationDidFinishLaunching(aNotification: NSNotification) {
+    func applicationDidFinishLaunching(_ aNotification: Notification) {
         runSelfDebuggerTest()
         exit(0)
     }
@@ -18,13 +18,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 func runSelfDebuggerTest() {
     var output = ""
-    func print(s: String) {
+    func print(_ s: String) {
         Swift.print(s)
         output.write(s + "\n")
     }
 
     // Main thread info.
-    let mainThread: Thread
+    let mainThread: Selfde.Thread
     do {
         mainThread = try getCurrentThread()
     } catch {
@@ -32,8 +32,8 @@ func runSelfDebuggerTest() {
     }
     print("Main thread: \(mainThread.threadID)")
     // Used to signal the main thread that the breakpoint is installed.
-    let semaphore = dispatch_semaphore_create(0)
-    let breakpointAddress = COpaquePointer(getTestFunctionAddress())
+    let semaphore = DispatchSemaphore(value: 0)
+    let breakpointAddress = OpaquePointer(getTestFunctionAddress())!
 
     runSelfdeController ({ controller in
         print("Reached callback")
@@ -59,9 +59,9 @@ func runSelfDebuggerTest() {
                 fatalError()
             }
             sleep(2)
-            dispatch_semaphore_signal(semaphore)
+            semaphore.signal()
 
-            guard case .CaughtException(let exception) = try controller.waitForEvent() else {
+            guard case .caughtException(let exception) = try controller.waitForEvent() else {
                 fatalError("Not an exception")
             }
             if exception.thread != mainThread {
@@ -80,7 +80,7 @@ func runSelfDebuggerTest() {
             try exception.thread.beginSingleStepMode()
             try exception.thread.resume()
 
-            guard case .CaughtException(let exception2) = try controller.waitForEvent() else {
+            guard case .caughtException(let exception2) = try controller.waitForEvent() else {
                 fatalError("Not an exception")
             }
             let hitIP2 = try exception2.thread.getInstructionPointer()
@@ -97,7 +97,7 @@ func runSelfDebuggerTest() {
             try exception2.thread.resume()
 
             // Remove the breakpoint and resume the thread.
-            guard case .CaughtException(let exception3) = try controller.waitForEvent() else {
+            guard case .caughtException(let exception3) = try controller.waitForEvent() else {
                 fatalError("Not an exception")
             }
             let hitIP3 = try exception3.thread.getInstructionPointer()
@@ -119,21 +119,21 @@ func runSelfDebuggerTest() {
             fatalError()
     })
 
-    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER)
+    semaphore.wait(timeout: DispatchTime.distantFuture)
     print("Main thread running code")
     testFunction()
     print("Main thread ran once")
     testFunction()
     print("Main thread done running!")
 
-    let result = output.containsString("Reached callback") &&
-        output.containsString("Main thread running code") &&
-        output.containsString("Caught the breakpoint") &&
-        output.containsString("Caught the single step past the original instruction") &&
-        output.containsString("Main thread ran once") &&
-        output.containsString("Caught the breakpoint again") &&
-        output.containsString("Controller done") &&
-        output.containsString("Main thread done running")
+    let result = output.contains("Reached callback") &&
+        output.contains("Main thread running code") &&
+        output.contains("Caught the breakpoint") &&
+        output.contains("Caught the single step past the original instruction") &&
+        output.contains("Main thread ran once") &&
+        output.contains("Caught the breakpoint again") &&
+        output.contains("Controller done") &&
+        output.contains("Main thread done running")
     guard result == true else {
         fatalError("Test failed")
     }

@@ -4,36 +4,36 @@
 //
 
 public enum MemoryReadResult {
-    case Bytes(UnsafeBufferPointer<UInt8>)
+    case bytes(UnsafeBufferPointer<UInt8>)
 }
 
 public enum ThreadReference {
-    case ID(ThreadID) // NNN
-    case Any          // 0
-    case All          // -1
+    case id(ThreadID) // NNN
+    case any          // 0
+    case all          // -1
 }
 
 public enum ThreadResumeAction: Int {
-    case None
-    case Stop
-    case Continue
-    case Step
+    case none
+    case stop
+    case `continue`
+    case step
 }
 
 public struct ThreadResumeEntry {
     public let thread: ThreadReference
     public let action: ThreadResumeAction
-    public let address: COpaquePointer?
+    public let address: OpaquePointer?
 }
 
 public enum ProcessResumeAction {
-    case ResumeThreads(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction)
-    case Exit
+    case resumeThreads(actions: [ThreadResumeEntry], defaultAction: ThreadResumeAction)
+    case exit
 }
 
 public struct ThreadStopInfo {
     public let signalNumber: UInt8
-    public let dispatchQueueAddress: COpaquePointer?
+    public let dispatchQueueAddress: OpaquePointer?
     public struct MachInfo {
         let exceptionType: Int
         let exceptionData: [UInt]
@@ -45,7 +45,7 @@ public struct ThreadStopInfo {
     }
     public let machInfo: MachInfo?
 
-    public init(signalNumber: UInt8, dispatchQueueAddress: COpaquePointer?, machInfo: MachInfo?) {
+    public init(signalNumber: UInt8, dispatchQueueAddress: OpaquePointer?, machInfo: MachInfo?) {
         self.signalNumber = signalNumber
         self.dispatchQueueAddress = dispatchQueueAddress
         self.machInfo = machInfo
@@ -58,31 +58,31 @@ public protocol Debugger: class {
     var primaryThreadID: ThreadID { get }
     var threads: [ThreadID] { get }
 
-    func attach(processID: Int) throws
-    func getSharedLibraryInfoAddress() throws -> COpaquePointer
+    func attach(_ processID: Int) throws
+    func getSharedLibraryInfoAddress() throws -> OpaquePointer
 
     func interruptExecution() throws
 
     func detach()
 
-    func getStopInfoForThread(threadID: ThreadID) throws -> ThreadStopInfo
-    func isThreadAlive(threadID: ThreadID) throws -> Bool
+    func getStopInfoForThread(_ threadID: ThreadID) throws -> ThreadStopInfo
+    func isThreadAlive(_ threadID: ThreadID) throws -> Bool
 
-    func setBreakpoint(address: COpaquePointer, byteSize: Int) throws
-    func removeBreakpoint(address: COpaquePointer) throws
+    func setBreakpoint(_ address: OpaquePointer, byteSize: Int) throws
+    func removeBreakpoint(_ address: OpaquePointer) throws
 
     // Instruction Pointer/Program counter.
-    func getIPRegisterValueForThread(threadID: ThreadID) throws -> COpaquePointer
+    func getIPRegisterValueForThread(_ threadID: ThreadID) throws -> OpaquePointer
 
-    func getRegisterValueForThread(threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8>
-    func setRegisterValueForThread(threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, source: ArraySlice<UInt8>) throws
+    func getRegisterValueForThread(_ threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, dest: inout [UInt8]) throws -> ArraySlice<UInt8>
+    func setRegisterValueForThread(_ threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, source: ArraySlice<UInt8>) throws
 
-    func getRegisterContextForThread(threadID: ThreadID, inout dest: [UInt8]) throws -> ArraySlice<UInt8>
-    func setRegisterContextForThread(threadID: ThreadID, source: ArraySlice<UInt8>) throws
+    func getRegisterContextForThread(_ threadID: ThreadID, dest: inout [UInt8]) throws -> ArraySlice<UInt8>
+    func setRegisterContextForThread(_ threadID: ThreadID, source: ArraySlice<UInt8>) throws
 
-    func allocate(size: Int, permissions: MemoryPermissions) throws -> COpaquePointer
-    func deallocate(address: COpaquePointer) throws
+    func allocate(_ size: Int, permissions: MemoryPermissions) throws -> OpaquePointer
+    func deallocate(_ address: OpaquePointer) throws
 
-    func readMemory(address: COpaquePointer, size: Int) throws -> MemoryReadResult
-    func writeMemory(address: COpaquePointer, bytes: [UInt8]) throws
+    func readMemory(_ address: OpaquePointer, size: Int) throws -> MemoryReadResult
+    func writeMemory(_ address: OpaquePointer, bytes: [UInt8]) throws
 }

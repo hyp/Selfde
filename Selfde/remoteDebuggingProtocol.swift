@@ -3,7 +3,7 @@
 //  Selfde
 //
 
-extension CollectionType where Self.Generator.Element == UInt8 {
+extension Collection where Self.Iterator.Element == UInt8 {
     // Remote debugging protocol checksum.
     var checksum: UInt8 {
         var computedChecksum: UInt8 = 0
@@ -16,7 +16,7 @@ extension CollectionType where Self.Generator.Element == UInt8 {
 
 // Binary encoding that's used for x/X packets.
 // Characters '}'  '#'  '$'  '*' are escaped with '}' (0x7d) character and then XOR'ed with 0x20.
-extension CollectionType where Self.Generator.Element == UInt8, Self.Index == Int {
+extension Collection where Self.Iterator.Element == UInt8, Self.Index == Int, Self.IndexDistance == Int {
     var encodedBinaryData: [UInt8] {
         var output = [UInt8]()
         output.reserveCapacity((count * 3) / 2) // Reserve 1.5 capacity to have enough space for escaped characters.
@@ -34,23 +34,23 @@ extension CollectionType where Self.Generator.Element == UInt8, Self.Index == In
 
     var decodedBinaryData: [UInt8] {
         var output = [UInt8]()
-        output.reserveCapacity(count)
+        output.reserveCapacity(Int(count))
         var i = startIndex
         let end = endIndex
         while i < end {
             switch self[i] {
             case UInt8(ascii: "}"):
-                let nextIndex = i.successor()
+                let nextIndex = (i + 1)
                 guard nextIndex < end else {
                     output.append(UInt8(ascii: "}"))
                     i = nextIndex
                     break
                 }
                 output.append(self[nextIndex] ^ 0x20)
-                i = i.advancedBy(2)
+                i = i.advanced(by: 2)
             case let byte:
                 output.append(byte)
-                i = i.successor()
+                i = (i + 1)
             }
         }
         return output
@@ -58,16 +58,16 @@ extension CollectionType where Self.Generator.Element == UInt8, Self.Index == In
 }
 
 enum RemoteDebuggingPacket {
-    case Payload(String)
-    case BinaryPayload([UInt8])
-    case ACK
-    case NACK
-    case Interrupt
-    case InvalidChecksum
-    case InvalidPacket
+    case payload(String)
+    case binaryPayload([UInt8])
+    case ack
+    case nack
+    case interrupt
+    case invalidChecksum
+    case invalidPacket
 }
 
-func parsePackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>, checkChecksums: Bool = true) -> [RemoteDebuggingPacket] {
+func parsePackets(_ partialData: inout [UInt8], newData: ArraySlice<UInt8>, checkChecksums: Bool = true) -> [RemoteDebuggingPacket] {
     // Get the whole data.
     var dataBuffer = [UInt8]()
     let data: ArraySlice<UInt8>
@@ -85,33 +85,33 @@ func parsePackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>, checkC
     outerLoop: while i < end {
         switch data[i] {
         case UInt8(ascii: "+"):
-            packets.append(.ACK)
-            i = i.successor()
+            packets.append(.ack)
+            i = (i + 1)
         case UInt8(ascii: "-"):
-            packets.append(.NACK)
-            i = i.successor()
+            packets.append(.nack)
+            i = (i + 1)
         case UInt8(ascii: "$"):
             // Find '#'
-            var j = i.successor()
+            var j = (i + 1)
             while j < end {
                 if data[j] == UInt8(ascii: "#") {
                     break
                 }
-                j = j.successor()
+                j = (j + 1)
             }
             guard (j + 3) <= end else {
                 // No end found.
                 break outerLoop
             }
-            j = j.advancedBy(3) // The '#' and checksum.
+            j = j.advanced(by: 3) // The '#' and checksum.
             packets.append(extractPayloadPacket(data[i..<j], checkChecksums: checkChecksums))
             i = j
         case 0x03:
-            packets.append(.Interrupt)
-            i = i.successor()
+            packets.append(.interrupt)
+            i = (i + 1)
         default:
             // Junk byte, Ignore.
-            i = i.successor()
+            i = (i + 1)
         }
     }
 
@@ -122,11 +122,11 @@ func parsePackets(inout partialData: [UInt8], newData: ArraySlice<UInt8>, checkC
     return packets
 }
 
-private func extractPayloadPacket(data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> RemoteDebuggingPacket {
+private func extractPayloadPacket(_ data: ArraySlice<UInt8>, checkChecksums: Bool = true) -> RemoteDebuggingPacket {
     assert(data.first == Optional(UInt8(ascii: "$")))
     let info = data.dropFirst(1)
     guard info.count >= 3 else {
-        return .InvalidPacket
+        return .invalidPacket
     }
     let checksumInfo = info.suffix(3)
     let payload = info.dropLast(3)
@@ -134,28 +134,28 @@ private func extractPayloadPacket(data: ArraySlice<UInt8>, checkChecksums: Bool 
     // Extract the sent checksum.
     if checkChecksums {
         assert(checksumInfo.count == 3)
-        let checksumString = String(UnicodeScalar(checksumInfo[checksumInfo.startIndex.successor()])) + String(UnicodeScalar(checksumInfo[checksumInfo.startIndex.advancedBy(2)]))
+        let checksumString = String(UnicodeScalar(checksumInfo[(checksumInfo.startIndex + 1)])) + String(UnicodeScalar(checksumInfo[checksumInfo.startIndex.advanced(by: 2)]))
         guard let checksum = Int(checksumString, radix: 16) where checksumInfo[checksumInfo.startIndex] == UInt8(ascii: "#") else {
-            return .InvalidPacket
+            return .invalidPacket
         }
 
         // Compute the checksum.
         if checksum != Int(payload.checksum) {
-            return .InvalidChecksum
+            return .invalidChecksum
         }
     }
 
     // Return the payload.
     if let first = payload.first where first == UInt8(ascii: "X") {
         // Binary writes need a binary payload.
-        return .BinaryPayload(Array(payload))
+        return .binaryPayload(Array(payload))
     }
     var str = ""
     str.reserveCapacity(payload.count)
     for byte in payload {
         str.write(String(UnicodeScalar(byte)))
     }
-    return .Payload(str)
+    return .payload(str)
 }
 
 // Parses the debugger packet payloads.
@@ -166,13 +166,13 @@ struct PacketParser {
 
     init(payload: String, offset: Int = 0) {
         self.payload = payload.unicodeScalars
-        index = self.payload.startIndex.advancedBy(offset)
+        index = self.payload.index(self.payload.startIndex, offsetBy: offset)
         endIndex = self.payload.endIndex
     }
 
     init(payload: String, offset: String.Index) {
         self.payload = payload.unicodeScalars
-        index = offset.samePositionIn(self.payload)
+        index = offset.samePosition(in: self.payload)
         endIndex = self.payload.endIndex
     }
 
@@ -185,15 +185,15 @@ struct PacketParser {
             return nil
         }
         let result = payload[index]
-        index = index.successor()
+        index = payload.index(after: index)
         return result
     }
 
-    mutating func consumeIfPresent(c: UnicodeScalar) -> Bool {
+    mutating func consumeIfPresent(_ c: UnicodeScalar) -> Bool {
         guard index < endIndex && payload[index] == c else {
             return false
         }
-        index = index.successor()
+        index = payload.index(after: index)
         return true
     }
 
@@ -211,7 +211,7 @@ struct PacketParser {
             result <<= 4
             result |= UInt64(value)
             count += 1
-            index = index.successor()
+            index = payload.index(after: index)
         }
         return (result, count)
     }
@@ -252,28 +252,28 @@ struct PacketParser {
             guard !overflow else {
                 return nil
             }
-            index = index.successor()
+            index = payload.index(after: index)
         }
         return index != startingIndex ? result : nil
     }
 
     // Addresses are represented with big endian unsigned integers.
-    mutating func consumeAddress() -> COpaquePointer? {
+    mutating func consumeAddress() -> OpaquePointer? {
         guard let address = consumeHexUInt() else {
             return nil
         }
-        return COpaquePointer(bitPattern: address)
+        return OpaquePointer(bitPattern: address)
     }
 
-    private mutating func readHexBytes(endIndex: String.UnicodeScalarView.Index) -> [UInt8]? {
+    private mutating func readHexBytes(_ endIndex: String.UnicodeScalarView.Index) -> [UInt8]? {
         var result = [UInt8]()
-        while index.successor() < endIndex {
-            guard let high = payload[index].hexValue, low = payload[index.successor()].hexValue else {
+        while payload.index(after: index) < endIndex {
+            guard let high = payload[index].hexValue, let low = payload[payload.index(after: index)].hexValue else {
                 break
             }
             // Not gonna overflow as high and low are both 15 max.
             result.append(UInt8(high &* 16 &+ low))
-            index = index.advancedBy(2)
+            index = payload.index(index, offsetBy: 2)
         }
         // Return nothing if there isn't an even number of hex digits, or when some character isn't a hex digit.
         return index < endIndex ? nil : result
@@ -283,7 +283,7 @@ struct PacketParser {
         return readHexBytes(endIndex)
     }
 
-    mutating func readHexBytes(size: Int) -> [UInt8]? {
-        return readHexBytes(index.advancedBy(size * 2))
+    mutating func readHexBytes(_ size: Int) -> [UInt8]? {
+        return readHexBytes(payload.index(index, offsetBy: size * 2))
     }
 }

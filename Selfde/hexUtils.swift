@@ -18,9 +18,9 @@ extension UnicodeScalar {
     }
 }
 
-extension COpaquePointer {
+extension OpaquePointer {
     var bigEndianHexString: String {
-        return String(unsafeBitCast(self, UInt.self), radix: 16, uppercase: false)
+        return String(unsafeBitCast(self, to: UInt.self), radix: 16, uppercase: false)
     }
 }
 
@@ -35,7 +35,7 @@ private extension UInt8 {
     }
 }
 
-extension CollectionType where Self.Generator.Element == UInt8, Self.Index == Int {
+extension Collection where Self.Iterator.Element == UInt8, Self.Index == Int, Self.IndexDistance == Int {
     var hexString: String {
         var output = ""
         output.reserveCapacity(count * 2)

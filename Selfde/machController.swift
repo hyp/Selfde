@@ -9,7 +9,7 @@ import Foundation
 public struct ControllerInterrupter {
     private unowned let controller: Controller
 
-    public func sendInterrupt(@noescape function: () -> ()) {
+    public func sendInterrupt(_ function: @noescape () -> ()) {
         controller.interrupt(function)
     }
 }
@@ -19,19 +19,19 @@ public class Controller {
     private var state: SelfdeMachControllerState
     private var hasInterrupt: Bool = false
     private var utilityThreadPort: mach_port_t // Can be used for things like listening for remote debugging commands.
-    private var utilityThread: NSThread?
+    private var utilityThread: Foundation.Thread?
     private struct BreakpointState {
         let machineState: MachineBreakpointState
-        let landingAddress: COpaquePointer
+        let landingAddress: OpaquePointer
         var counter: Int
     }
-    private var breakpoints: [COpaquePointer: BreakpointState] = [:]
-    private var breakpointLandingAddresses: [COpaquePointer: COpaquePointer] = [:]
+    private var breakpoints: [OpaquePointer: BreakpointState] = [:]
+    private var breakpointLandingAddresses: [OpaquePointer: OpaquePointer] = [:]
     private struct AllocationState {
         let address: mach_vm_address_t
         let size: mach_vm_size_t
     }
-    private var allocations: [COpaquePointer: AllocationState] = [:]
+    private var allocations: [OpaquePointer: AllocationState] = [:]
 
     init() throws {
         // Create the synchronisation primitives.
@@ -51,7 +51,7 @@ public class Controller {
                 return
             }
         }
-        if let thread = utilityThread where !thread.finished {
+        if let thread = utilityThread where !thread.isFinished {
             if thread_terminate(utilityThreadPort) != KERN_SUCCESS {
                 return
             }
@@ -63,7 +63,7 @@ public class Controller {
 
     /// Starts a thread that listens for exceptions like breakpoints for
     /// the given threads.
-    public func initializeExceptionHandlingForThreads(threads: [Thread]) throws {
+    public func initializeExceptionHandlingForThreads(_ threads: [Thread]) throws {
         // Create the exception port and make sure it's connected to the threads we're interested in.
         try handleError(selfdeCreateExceptionPort(state.task, &state.exceptionPort))
         for thread in threads {
@@ -74,7 +74,7 @@ public class Controller {
         try handleError(selfdeStartExceptionThread(&state))
     }
 
-    private func interrupt(@noescape function: () -> ()) {
+    private func interrupt(_ function: @noescape () -> ()) {
         pthread_mutex_lock(&state.synchronisationMutex)
         hasInterrupt = true
         function()
@@ -82,8 +82,8 @@ public class Controller {
         pthread_mutex_unlock(&state.synchronisationMutex)
     }
 
-    public func runUtilityThread(function: (ControllerInterrupter) -> ()) {
-        final class UtilityThread: NSThread {
+    public func runUtilityThread(_ function: (ControllerInterrupter) -> ()) {
+        final class UtilityThread: Foundation.Thread {
             unowned let controller: Controller
             let function: (ControllerInterrupter) -> ()
 
@@ -112,7 +112,7 @@ public class Controller {
         pthread_mutex_unlock(&state.synchronisationMutex)
     }
 
-    public func waitForEvent(interruptHandler interruptHandler: (() -> ())? = nil) throws -> ControllerEvent {
+    public func waitForEvent(interruptHandler: (() -> ())? = nil) throws -> ControllerEvent {
         pthread_mutex_lock(&state.synchronisationMutex)
         while !state.hasCaughtException && !hasInterrupt {
             pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
@@ -122,7 +122,7 @@ public class Controller {
             interruptHandler?()
             hasInterrupt = false
             pthread_mutex_unlock(&state.synchronisationMutex)
-            return .Interrupted
+            return .interrupted
         }
         let data = UnsafeMutableBufferPointer<mach_exception_data_type_t>(start: state.caughtException.exceptionData, count: Int(state.caughtException.exceptionDataSize))
         let result = Exception(thread: Thread(state.caughtException.thread), type: state.caughtException.exceptionType, data: Array(data.map { UInt($0) }))
@@ -131,10 +131,10 @@ public class Controller {
         free(state.caughtException.exceptionData)
         pthread_mutex_unlock(&state.synchronisationMutex)
         try handleException(result)
-        return .CaughtException(result)
+        return .caughtException(result)
     }
 
-    private func handleException(exception: Exception) throws {
+    private func handleException(_ exception: Exception) throws {
         guard exception.isBreakpoint else {
             return
         }
@@ -147,14 +147,14 @@ public class Controller {
         try exception.thread.setInstructionPointer(address)
     }
 
-    public func getSharedLibraryInfoAddress() throws -> COpaquePointer {
+    public func getSharedLibraryInfoAddress() throws -> OpaquePointer {
         var dyldInfo = task_dyld_info()
         var count = mach_msg_type_number_t(sizeof(task_dyld_info) / sizeof(Int32))
         let error = withUnsafeMutablePointer(&dyldInfo) {
             task_info(self.state.task, task_flavor_t(TASK_DYLD_INFO), UnsafeMutablePointer<integer_t>($0), &count)
         }
         try handleError(error)
-        return COpaquePointer(bitPattern: UInt(dyldInfo.all_image_info_addr))
+        return OpaquePointer(bitPattern: UInt(dyldInfo.all_image_info_addr))!
     }
 
     public func suspendThreads() throws {
@@ -175,23 +175,23 @@ public class Controller {
         try handleError(task_threads(state.task, &threads, &count))
         var result = [Thread]()
         for i in 0..<count {
-            let thread = threads[Int(i)]
+            let thread = threads?[Int(i)]
             if thread == state.controllerThread || thread == state.msgServerThread || thread == utilityThreadPort {
                 continue;
             }
-            result.append(Thread(thread))
+            result.append(Thread(thread!))
         }
         return result
     }
 
     /// Gives the given memory ALL protections.
-    private func memoryProtectAll(address: COpaquePointer, size: vm_size_t) throws {
-        let addr = vm_address_t(unsafeBitCast(address, UInt.self))
+    private func memoryProtectAll(_ address: OpaquePointer, size: vm_size_t) throws {
+        let addr = vm_address_t(unsafeBitCast(address, to: UInt.self))
         try handleError(vm_protect(state.task, addr, size, boolean_t(0), getVMProtAll()))
     }
 
-    public func installBreakpoint(address: COpaquePointer) throws -> Breakpoint {
-        if let index = breakpoints.indexForKey(address) {
+    public func installBreakpoint(_ address: OpaquePointer) throws -> Breakpoint {
+        if let index = breakpoints.index(forKey: address) {
             var bp = breakpoints[index].1
             bp.counter += 1
             breakpoints.updateValue(bp, forKey: address)
@@ -205,13 +205,13 @@ public class Controller {
         return Breakpoint(address: address)
     }
 
-    private func restoreBreakpointsOriginalInstruction(breakpoint: (address: COpaquePointer, BreakpointState)) {
+    private func restoreBreakpointsOriginalInstruction(_ breakpoint: (address: OpaquePointer, BreakpointState)) {
         breakpoint.1.machineState.restoreOriginalInstruction(breakpoint.address)
     }
 
-    public func removeBreakpoint(breakpoint: Breakpoint) throws {
-        guard let index = breakpoints.indexForKey(breakpoint.address) else {
-            throw ControllerError.InvalidBreakpoint
+    public func removeBreakpoint(_ breakpoint: Breakpoint) throws {
+        guard let index = breakpoints.index(forKey: breakpoint.address) else {
+            throw ControllerError.invalidBreakpoint
         }
         let keyValue = breakpoints[index]
         var bp = keyValue.1
@@ -220,16 +220,16 @@ public class Controller {
             breakpoints.updateValue(bp, forKey: breakpoint.address)
             return
         }
-        restoreBreakpointsOriginalInstruction(keyValue)
-        breakpoints.removeAtIndex(index)
-        guard let address = breakpointLandingAddresses.removeValueForKey(bp.landingAddress) else {
+		restoreBreakpointsOriginalInstruction((address: keyValue.key, keyValue.value))
+        breakpoints.remove(at: index)
+        guard let address = breakpointLandingAddresses.removeValue(forKey: bp.landingAddress) else {
             assertionFailure()
             return
         }
         assert(address == breakpoint.address)
     }
 
-    public func allocate(size: Int, permissions: MemoryPermissions) throws -> COpaquePointer {
+    public func allocate(_ size: Int, permissions: MemoryPermissions) throws -> OpaquePointer {
         var address = mach_vm_address_t()
         let allocationSize = mach_vm_size_t(size)
         try handleError(mach_vm_allocate(state.task, &address, allocationSize, 1))
@@ -249,14 +249,14 @@ public class Controller {
             mach_vm_deallocate(state.task, address, allocationSize)
             throw error
         }
-        let result = COpaquePointer(bitPattern: UInt(address))
-        allocations[result] = AllocationState(address: address, size: allocationSize)
-        return result
+        let result = OpaquePointer(bitPattern: UInt(address))
+        allocations[result!] = AllocationState(address: address, size: allocationSize)
+        return result!
     }
 
-    public func deallocate(address: COpaquePointer) throws {
+    public func deallocate(_ address: OpaquePointer) throws {
         guard let allocation = allocations[address] else {
-            throw ControllerError.InvalidAllocation
+            throw ControllerError.invalidAllocation
         }
         try handleError(mach_vm_deallocate(state.task, allocation.address, allocation.size))
     }

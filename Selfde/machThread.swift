@@ -31,31 +31,31 @@ public struct Thread {
         impl = MachMachineThread(thread: value)
     }
 
-    public func getInstructionPointer() throws -> COpaquePointer {
+    public func getInstructionPointer() throws -> OpaquePointer {
         return try impl.getInstructionPointer()
     }
 
-    public func setInstructionPointer(address: COpaquePointer) throws {
+    public func setInstructionPointer(_ address: OpaquePointer) throws {
         try impl.setInstructionPointer(address)
     }
 
-    public func getStackPointer() throws -> COpaquePointer {
+    public func getStackPointer() throws -> OpaquePointer {
         return try impl.getStackPointer()
     }
 
-    public func getRegisterValue(id: UInt32, setID: UInt32, inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+    public func getRegisterValue(_ id: UInt32, setID: UInt32, dest: inout [UInt8]) throws -> ArraySlice<UInt8> {
         return try impl.getRegisterValue(id, setID: setID, dest: &dest)
     }
 
-    public func setRegisterValue(id: UInt32, setID: UInt32, source: ArraySlice<UInt8>) throws {
+    public func setRegisterValue(_ id: UInt32, setID: UInt32, source: ArraySlice<UInt8>) throws {
         return try impl.setRegisterValue(id, setID: setID, source: source)
     }
 
-    public func getRegisterContext(inout dest: [UInt8]) throws -> ArraySlice<UInt8> {
+    public func getRegisterContext(_ dest: inout [UInt8]) throws -> ArraySlice<UInt8> {
         return try impl.getRegisterContext(&dest)
     }
 
-    public func setRegisterContext(source: ArraySlice<UInt8>) throws {
+    public func setRegisterContext(_ source: ArraySlice<UInt8>) throws {
         return try impl.setRegisterContext(source)
     }
 
@@ -83,12 +83,12 @@ public struct Thread {
         var infoData: thread_info_data_t = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0) // ?
         var size = mach_msg_type_number_t(THREAD_INFO_MAX)
         try handleError(withUnsafeMutablePointer(&infoData) { pointer in
-            let statePtr = thread_info_t(COpaquePointer(pointer))
+            let statePtr = thread_info_t(OpaquePointer(pointer))
             return thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), statePtr, &size)
         })
         return withUnsafePointer(&infoData) { pointer -> thread_basic_info in
-            let basicInfoPtr = thread_basic_info_t(COpaquePointer(pointer))
-            return basicInfoPtr.memory
+            let basicInfoPtr = thread_basic_info_t(OpaquePointer(pointer))
+            return basicInfoPtr.pointee
         }
     }
 
@@ -104,17 +104,17 @@ public struct Thread {
     public func getRunState() throws -> RunState {
         switch try getBasicInfo().run_state {
         case TH_STATE_RUNNING:
-            return .Running
+            return .running
         case TH_STATE_STOPPED:
-            return .Stopped
+            return .stopped
         case TH_STATE_WAITING:
-            return .Waiting
+            return .waiting
         case TH_STATE_UNINTERRUPTIBLE:
-            return .Uninterruptible
+            return .uninterruptible
         case TH_STATE_HALTED:
-            return .Halted
+            return .halted
         default:
-            throw ControllerError.InvalidRunState
+            throw ControllerError.invalidRunState
         }
     }
 
@@ -130,7 +130,7 @@ public struct Thread {
         }
     }
 
-    public func getDispatchQueueAddress() throws -> COpaquePointer {
-        return COpaquePointer(bitPattern: UInt(try getIdentifierInfo().dispatch_qaddr))
+    public func getDispatchQueueAddress() throws -> OpaquePointer {
+        return OpaquePointer(bitPattern: UInt(try getIdentifierInfo().dispatch_qaddr))!
     }
 }

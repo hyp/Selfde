@@ -5,11 +5,11 @@
 
 import Foundation
 
-public enum RemoteDebuggingIOError: ErrorType {
-    case InvalidHostAndPort
-    case StreamOpenError
-    case ReadError(message: String)
-    case WriteError(message: String)
+public enum RemoteDebuggingIOError: Error {
+    case invalidHostAndPort
+    case streamOpenError
+    case readError(message: String)
+    case writeError(message: String)
 }
 
 public protocol RemoteDebuggingReader: class {
@@ -19,24 +19,24 @@ public protocol RemoteDebuggingReader: class {
 }
 
 public protocol RemoteDebuggingWriter: class {
-    func write(data: ArraySlice<UInt8>) throws
+    func write(_ data: ArraySlice<UInt8>) throws
     func close()
 }
 
 private final class RemoteDebuggingSocketReader: RemoteDebuggingReader {
     let readStream: Unmanaged<CFReadStream>
-    var buffer: [UInt8] = [UInt8](count: 1024, repeatedValue: 0)
+    var buffer: [UInt8] = [UInt8](repeating: 0, count: 1024)
 
     init(readStream: Unmanaged<CFReadStream>) {
         self.readStream = readStream
     }
 
     func read() throws -> ArraySlice<UInt8> {
-        let readSize = buffer.withUnsafeMutableBufferPointer { (inout ptr: UnsafeMutableBufferPointer<UInt8>) in
+        let readSize = buffer.withUnsafeMutableBufferPointer { (ptr: inout UnsafeMutableBufferPointer<UInt8>) in
             CFReadStreamRead(readStream.takeUnretainedValue(), ptr.baseAddress, 1024)
         }
         guard readSize > 0 else {
-            throw RemoteDebuggingIOError.ReadError(message: readSize == 0 ? "Reached stream end" : "Stream disconnected")
+            throw RemoteDebuggingIOError.readError(message: readSize == 0 ? "Reached stream end" : "Stream disconnected")
         }
         return buffer.prefix(readSize)
     }
@@ -58,14 +58,14 @@ private final class RemoteDebuggingSocketWriter: RemoteDebuggingWriter {
         self.writeStream = writeStream
     }
 
-    func write(data: ArraySlice<UInt8>) throws {
+    func write(_ data: ArraySlice<UInt8>) throws {
         var buffer = data
         while !buffer.isEmpty {
             let writtenSize = buffer.withUnsafeBufferPointer {
                 CFWriteStreamWrite(writeStream.takeUnretainedValue(), $0.baseAddress, buffer.count)
             }
             guard writtenSize > 0 else {
-                throw RemoteDebuggingIOError.WriteError(message: writtenSize == 0 ? "Reached stream capacity" : "Stream disconnected")
+                throw RemoteDebuggingIOError.writeError(message: writtenSize == 0 ? "Reached stream capacity" : "Stream disconnected")
             }
             guard writtenSize < buffer.count else {
                 return
@@ -84,29 +84,29 @@ private final class RemoteDebuggingSocketWriter: RemoteDebuggingWriter {
     }
 }
 
-public func createRemoteDebuggingSocketConnection(hostAndPort: String) throws -> (RemoteDebuggingReader, RemoteDebuggingWriter) {
+public func createRemoteDebuggingSocketConnection(_ hostAndPort: String) throws -> (RemoteDebuggingReader, RemoteDebuggingWriter) {
     guard let (host, port) = parseHostAndPort(hostAndPort) else {
-        throw RemoteDebuggingIOError.InvalidHostAndPort
+        throw RemoteDebuggingIOError.invalidHostAndPort
     }
     var readStream: Unmanaged<CFReadStream>?
     var writeStream: Unmanaged<CFWriteStream>?
     CFStreamCreatePairWithSocketToHost(nil, host, UInt32(port), &readStream, &writeStream)
     guard let read = readStream, write = writeStream else {
-        throw RemoteDebuggingIOError.StreamOpenError
+        throw RemoteDebuggingIOError.streamOpenError
     }
     guard CFReadStreamOpen(read.takeUnretainedValue()) && CFWriteStreamOpen(write.takeUnretainedValue()) else {
-        throw RemoteDebuggingIOError.StreamOpenError
+        throw RemoteDebuggingIOError.streamOpenError
     }
     return (RemoteDebuggingSocketReader(readStream: read), RemoteDebuggingSocketWriter(writeStream: write))
 }
 
 // Parse the host and port that LLDB passes.
-private func parseHostAndPort(hostAndPort: String) -> (String, Int)? {
-    guard let colonIndex = hostAndPort.rangeOfString(":", options: [.BackwardsSearch]) else {
+private func parseHostAndPort(_ hostAndPort: String) -> (String, Int)? {
+    guard let colonIndex = hostAndPort.range(of: ":", options: [.backwards]) else {
         return nil
     }
-    let host = hostAndPort.substringToIndex(colonIndex.startIndex)
-    guard let port = Int(hostAndPort.substringFromIndex(colonIndex.endIndex)) else {
+    let host = hostAndPort.substring(to: colonIndex.lowerBound)
+    guard let port = Int(hostAndPort.substring(from: colonIndex.upperBound)) else {
         return nil
     }
     return (host, port)

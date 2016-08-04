@@ -27,7 +27,7 @@ private func getRegisterSets() -> [DNBRegisterSetInfo] {
     return result
 }
 
-private func getRegisterEntries(registerSets: [DNBRegisterSetInfo]) -> [RegisterMapEntry] {
+private func getRegisterEntries(_ registerSets: [DNBRegisterSetInfo]) -> [RegisterMapEntry] {
     var registers = [RegisterMapEntry]()
     var nameToRegisterNumber = [String:Int]()
     var registerNumber = 0
@@ -43,7 +43,7 @@ private func getRegisterEntries(registerSets: [DNBRegisterSetInfo]) -> [Register
             if register.value_regs == nil {
                 registerDataOffset += Int(register.size)
             }
-            guard let name = String.fromCString(register.name) else {
+            guard let name = String(validatingUTF8: register.name) else {
                 assertionFailure()
                 continue
             }
@@ -63,7 +63,7 @@ private func getRegisterEntries(registerSets: [DNBRegisterSetInfo]) -> [Register
             var newOffset = Int.max
             var i = 0
             while entry.info.value_regs[i] != nil {
-                guard let name = String.fromCString(entry.info.value_regs[i]),
+                guard let name = String(validatingUTF8: entry.info.value_regs[i]!),
                     number = nameToRegisterNumber[name] else {
                         assertionFailure()
                         break
@@ -88,7 +88,7 @@ private func getRegisterEntries(registerSets: [DNBRegisterSetInfo]) -> [Register
         if entry.info.update_regs != nil {
             var i = 0
             while entry.info.update_regs[i] != nil {
-                guard let name = String.fromCString(entry.info.update_regs[i]),
+                guard let name = String(validatingUTF8: entry.info.update_regs[i]!),
                     number = nameToRegisterNumber[name] else {
                         assertionFailure()
                         break
@@ -111,10 +111,10 @@ struct DebuggerRegisterState {
     init(debugger: Debugger) {
         registerSets = getRegisterSets()
         registers = getRegisterEntries(registerSets)
-        valueStorage = [UInt8](count: debugger.registerContextSize, repeatedValue: 0)
+        valueStorage = [UInt8](repeating: 0, count: debugger.registerContextSize)
     }
 
-    mutating func emitThreadStopInfoRegistersForThread(threadID: ThreadID, debugger: Debugger, inout dest: String) throws {
+    mutating func emitThreadStopInfoRegistersForThread(_ threadID: ThreadID, debugger: Debugger, dest: inout String) throws {
         for register in registers {
             // Only emit the GPR registers that aren't contained in other registers.
             // FIXME: Make this better.
@@ -129,22 +129,22 @@ struct DebuggerRegisterState {
 }
 
 // qRegisterInfo can be used to query the register set.
-func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> ResponseResult {
+func handleQRegisterInfo(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "qRegisterInfo".characters.count)
     guard let registerID = parser.consumeHexUInt().flatMap({ Int($0) }) else {
-        return .Invalid("Invalid register number")
+        return .invalid("Invalid register number")
     }
     guard registerID < server.registerState.registers.count else {
         // No more registers.
-        return .Error(.E45)
+        return .error(.e45)
     }
     let register = server.registerState.registers[registerID]
     var response = ""
-    if let name = String.fromCString(register.info.name) {
+    if let name = String(validatingUTF8: register.info.name) {
         response += "name:\(name);"
     }
-    if let alt = String.fromCString(register.info.alt) {
-        response += "alt-name:\(alt);"
+    if let alt = register.info.alt, altName = String(validatingUTF8: alt) {
+        response += "alt-name:\(altName);"
     }
 
     response += "bitsize:\(register.info.size * 8);"
@@ -177,7 +177,7 @@ func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> Res
     }
 
     if Int(register.info.set) < server.registerState.registerSets.count {
-        if let name = String.fromCString(server.registerState.registerSets[Int(register.info.set)].name) {
+        if let name = String(validatingUTF8: server.registerState.registerSets[Int(register.info.set)].name) {
             response += "set:\(name);"
         } else {
             assertionFailure()
@@ -209,7 +209,7 @@ func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> Res
 
     if !register.valueRegisterNumbers.isEmpty {
         response += "container-regs:"
-        for (i, registerNumber) in register.valueRegisterNumbers.enumerate() {
+        for (i, registerNumber) in register.valueRegisterNumbers.enumerated() {
             if i > 0 { response += "," }
             response += String(registerNumber, radix: 16, uppercase: false)
         }
@@ -218,28 +218,28 @@ func handleQRegisterInfo(inout server: DebugServerState, payload: String) -> Res
 
     if !register.invalidateRegisterNumbers.isEmpty {
         response += "invalidate-regs:"
-        for (i, registerNumber) in register.invalidateRegisterNumbers.enumerate() {
+        for (i, registerNumber) in register.invalidateRegisterNumbers.enumerated() {
             if i > 0 { response += "," }
             response += String(registerNumber, radix: 16, uppercase: false)
         }
         response += ";"
     }
 
-    return .Response(response)
+    return .response(response)
 }
 
 // p register
-func handleRegisterRead(inout server: DebugServerState, payload: String) -> ResponseResult {
+func handleRegisterRead(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let registerID = parser.consumeHexUInt().flatMap({ Int($0) }) else {
-        return .Invalid("Invalid register number")
+        return .invalid("Invalid register number")
     }
     guard let threadID = server.extractThreadID(payload) else {
-        return .Invalid("No thread specified")
+        return .invalid("No thread specified")
     }
     guard registerID < server.registerState.registers.count else {
         server.logger?.log("Unknown register number requested: \(registerID)")
-        return .Error(.E47)
+        return .error(.e47)
     }
     let register = server.registerState.registers[registerID]
     assert(register.info.reg != INVALID_NUB_REGNUM)
@@ -247,81 +247,81 @@ func handleRegisterRead(inout server: DebugServerState, payload: String) -> Resp
     do {
         let bytes = try server.debugger.getRegisterValueForThread(threadID, registerID: register.info.reg, registerSetID: register.info.set, dest: &server.registerState.valueStorage)
         assert(bytes.count == Int(register.info.size))
-        return .Response(bytes.hexString)
+        return .response(bytes.hexString)
     } catch {
         // FIXME: Is this a good behaviour? (DebugServer tries to report really empty registers)
-        return .Error(.E32)
+        return .error(.e32)
     }
 }
 
 // P register = value
-func handleRegisterWrite(inout server: DebugServerState, payload: String) -> ResponseResult {
+func handleRegisterWrite(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let registerID = parser.consumeHexUInt().flatMap({ Int($0) }) else {
-        return .Invalid("Invalid register number")
+        return .invalid("Invalid register number")
     }
     guard parser.consumeIfPresent("=") else {
-        return .Invalid("Missing equals sign")
+        return .invalid("Missing equals sign")
     }
     guard registerID < server.registerState.registers.count else {
         server.logger?.log("Unknown register number requested: \(registerID)")
-        return .Error(.E47)
+        return .error(.e47)
     }
     let register = server.registerState.registers[registerID]
     assert(register.info.reg != INVALID_NUB_REGNUM)
     assert(register.info.set != INVALID_NUB_REGNUM)
     guard let value = parser.readHexBytes(Int(register.info.size)) else {
-        return .Invalid("Invalid register value")
+        return .invalid("Invalid register value")
     }
     guard let threadID = server.extractThreadID(payload) else {
-        return .Invalid("No thread specified")
+        return .invalid("No thread specified")
     }
     do {
         try server.debugger.setRegisterValueForThread(threadID, registerID: register.info.reg, registerSetID: register.info.set, source: value[0..<value.count])
-        return .OK
+        return .ok
     } catch {
-        return .Error(.E32)
+        return .error(.e32)
     }
 }
 
 // g
-func handleGPRegistersRead(inout server: DebugServerState, payload: String) -> ResponseResult {
+func handleGPRegistersRead(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     guard let threadID = server.extractThreadID(payload) else {
-        return .Invalid("No thread specified")
+        return .invalid("No thread specified")
     }
     do {
         let bytes = try server.debugger.getRegisterContextForThread(threadID, dest: &server.registerState.valueStorage)
         assert(bytes.count == server.debugger.registerContextSize)
-        return .Response(bytes.hexString)
+        return .response(bytes.hexString)
     } catch {
-        return .Error(.E74)
+        return .error(.e74)
     }
 }
 
 // G context-value
-func handleGPRegistersWrite(inout server: DebugServerState, payload: String) -> ResponseResult {
+func handleGPRegistersWrite(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
     guard let value = parser.readHexBytes(server.debugger.registerContextSize) else {
-        return .Invalid("Invalid register context value")
+        return .invalid("Invalid register context value")
     }
     guard let threadID = server.extractThreadID(payload) else {
-        return .Invalid("No thread specified")
+        return .invalid("No thread specified")
     }
     do {
         try server.debugger.setRegisterContextForThread(threadID, source: value[0..<value.count])
-        return .OK
+        return .ok
     } catch {
-        return .Error(.E55)
+        return .error(.e55)
     }
 }
 
 // QSaveRegisterState
-func handleQSaveRegisterState(inout server: DebugServerState, payload: String) -> ResponseResult {
+func handleQSaveRegisterState(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     guard let threadID = server.extractThreadID(payload) else {
-        return .Invalid("No thread specified")
+        return .invalid("No thread specified")
     }
     do {
-        var storage = [UInt8](count: server.registerState.valueStorage.count, repeatedValue: 0)
+        var storage = [UInt8](repeating: 0, count: server.registerState.valueStorage.count)
         let bytes = try server.debugger.getRegisterContextForThread(threadID, dest: &storage)
         assert(storage.count == bytes.count)
         let saveID = server.registerState.saveRegisterID
@@ -333,28 +333,28 @@ func handleQSaveRegisterState(inout server: DebugServerState, payload: String) -
             server.registerState.saveRegisterID = 1
         }
         server.registerState.savedRegisters[saveID] = storage
-        return .Response("\(saveID)")
+        return .response("\(saveID)")
     } catch {
-        return .Error(.E75)
+        return .error(.e75)
     }
 }
 
 // QRestoreRegisterState save-id
-func handleQRestoreRegisterState(inout server: DebugServerState, payload: String) -> ResponseResult {
+func handleQRestoreRegisterState(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: "QRestoreRegisterState:".characters.count)
     guard let saveID = parser.consumeUInt() else {
-        return .Invalid("Invalid save ID")
+        return .invalid("Invalid save ID")
     }
     guard let threadID = server.extractThreadID(payload) else {
-        return .Invalid("No thread specified")
+        return .invalid("No thread specified")
     }
     do {
-        guard let savedRegisters = server.registerState.savedRegisters.removeValueForKey(saveID) else {
-            return .Error(.E77)
+        guard let savedRegisters = server.registerState.savedRegisters.removeValue(forKey: saveID) else {
+            return .error(.e77)
         }
         try server.debugger.setRegisterContextForThread(threadID, source: savedRegisters[0..<savedRegisters.count])
-        return .OK
+        return .ok
     } catch {
-        return .Error(.E77)
+        return .error(.e77)
     }
 }

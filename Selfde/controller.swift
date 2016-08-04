@@ -5,35 +5,35 @@
 
 import Foundation
 
-public enum ControllerError: ErrorType {
-    case ThreadLaunchFailure
-    case MachKernelError(code: Int, message: String)
-    case InvalidBreakpoint
-    case InvalidRunState
-    case InvalidRegisterID
-    case InvalidRegisterSetID
-    case RegisterBufferIsTooSmall
-    case InvalidAllocation
+public enum ControllerError: Error {
+    case threadLaunchFailure
+    case machKernelError(code: Int, message: String)
+    case invalidBreakpoint
+    case invalidRunState
+    case invalidRegisterID
+    case invalidRegisterSetID
+    case registerBufferIsTooSmall
+    case invalidAllocation
 }
 
 public enum ControllerEvent {
-    case CaughtException(Exception)
-    case Interrupted
+    case caughtException(Exception)
+    case interrupted
 }
 
 public typealias ThreadID = UInt64
 
 public struct Breakpoint {
     // Breakpoint's address.
-    public let address: COpaquePointer
+    public let address: OpaquePointer
 
-    public init(address: COpaquePointer) {
+    public init(address: OpaquePointer) {
         self.address = address
     }
 }
 
 // Read/Write/Execute memory permissions.
-public struct MemoryPermissions: OptionSetType {
+public struct MemoryPermissions: OptionSet {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
 
@@ -44,31 +44,31 @@ public struct MemoryPermissions: OptionSetType {
 
 // Thread's run state.
 public enum RunState {
-    case Running
-    case Stopped
-    case Waiting
-    case Uninterruptible
-    case Halted
+    case running
+    case stopped
+    case waiting
+    case uninterruptible
+    case halted
 }
 
 /// Launches the controller thread.
-public func runSelfdeController(client: Controller -> (), errorCallback: ErrorType -> ()) {
-    assert(NSThread.isMainThread())
+public func runSelfdeController(_ client: (Controller) -> (), errorCallback: (Error) -> ()) {
+    assert(Foundation.Thread.isMainThread)
 
     class ThreadContext {
-        let callback: Controller -> ()
-        let errorCallback: ErrorType -> ()
+        let callback: (Controller) -> ()
+        let errorCallback: (Error) -> ()
 
-        init(callback: Controller -> (), errorCallback: ErrorType -> ()) {
+        init(callback: (Controller) -> (), errorCallback: (Error) -> ()) {
             self.callback = callback
             self.errorCallback = errorCallback
         }
     }
 
-    var controllerThread: pthread_t = nil
+    var controllerThread: pthread_t? = nil
     let context = ThreadContext(callback: client, errorCallback: errorCallback)
     let result = pthread_create(&controllerThread, nil, { (pointer: UnsafeMutablePointer<Void>) in
-        let unmanagedContext = Unmanaged<ThreadContext>.fromOpaque(COpaquePointer(pointer))
+        let unmanagedContext = Unmanaged<ThreadContext>.fromOpaque(pointer)
         let controller: Controller
         do {
             controller = try Controller()
@@ -84,6 +84,6 @@ public func runSelfdeController(client: Controller -> (), errorCallback: ErrorTy
         return nil
     }, UnsafeMutablePointer(Unmanaged.passRetained(context).toOpaque()))
     if result != 0 {
-        errorCallback(ControllerError.ThreadLaunchFailure)
+        errorCallback(ControllerError.threadLaunchFailure)
     }
 }
