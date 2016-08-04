@@ -811,13 +811,13 @@ public class DebugServer {
     private func sendOutput(_ output: inout [UInt8]) throws {
         guard !state.noAckMode else {
             output.append(contentsOf: "#00".utf8)
-            try writer.write(output[0..<output.count])
+            try writer.write(data: output[0..<output.count])
             return
         }
         // Compute the checksum.
         let checksum = output[1..<output.count].checksum
         output.append(contentsOf: "#\([checksum].hexString)".utf8)
-        try writer.write(output[0..<output.count])
+        try writer.write(data: output[0..<output.count])
     }
 
     private func send(_ payload: String) throws {
@@ -840,12 +840,12 @@ public class DebugServer {
 
     private func sendACK() throws {
         let data = [UInt8(ascii: "+")]
-        try writer.write(data[0..<data.count])
+        try writer.write(data: data[0..<data.count])
     }
 
     private func sendNACK() throws {
         let data = [UInt8(ascii: "-")]
-        try writer.write(data[0..<data.count])
+        try writer.write(data: data[0..<data.count])
     }
 
     /// Processes incoming packets until all of the received data is exhausted or a resume or an exit packet like 'c'/'k' is reached.

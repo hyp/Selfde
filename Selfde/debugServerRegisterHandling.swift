@@ -270,7 +270,7 @@ func handleRegisterWrite(_ server: inout DebugServerState, payload: String) -> R
     let register = server.registerState.registers[registerID]
     assert(register.info.reg != INVALID_NUB_REGNUM)
     assert(register.info.set != INVALID_NUB_REGNUM)
-    guard let value = parser.readHexBytes(Int(register.info.size)) else {
+    guard let value = parser.readHexBytes(size: Int(register.info.size)) else {
         return .invalid("Invalid register value")
     }
     guard let threadID = server.extractThreadID(payload) else {
@@ -301,7 +301,7 @@ func handleGPRegistersRead(_ server: inout DebugServerState, payload: String) ->
 // G context-value
 func handleGPRegistersWrite(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    guard let value = parser.readHexBytes(server.debugger.registerContextSize) else {
+    guard let value = parser.readHexBytes(size: server.debugger.registerContextSize) else {
         return .invalid("Invalid register context value")
     }
     guard let threadID = server.extractThreadID(payload) else {

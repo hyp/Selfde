@@ -190,7 +190,7 @@ public class Controller {
         try handleError(vm_protect(state.task, addr, size, boolean_t(0), getVMProtAll()))
     }
 
-    public func installBreakpoint(_ address: OpaquePointer) throws -> Breakpoint {
+    public func installBreakpoint(at address: OpaquePointer) throws -> Breakpoint {
         if let index = breakpoints.index(forKey: address) {
             var bp = breakpoints[index].1
             bp.counter += 1
@@ -199,14 +199,14 @@ public class Controller {
         }
         // Make sure we can write to the address.
         try memoryProtectAll(address, size: MachineBreakpointState.numberOfBytesToPatch)
-        let (machineState, landingAddress) = MachineBreakpointState.create(address)
+        let (machineState, landingAddress) = MachineBreakpointState.create(at: address)
         breakpoints[address] = BreakpointState(machineState: machineState, landingAddress: landingAddress, counter: 1)
         breakpointLandingAddresses[landingAddress] = address
         return Breakpoint(address: address)
     }
 
-    private func restoreBreakpointsOriginalInstruction(_ breakpoint: (address: OpaquePointer, BreakpointState)) {
-        breakpoint.1.machineState.restoreOriginalInstruction(breakpoint.address)
+	private func restoreBreakpointsOriginalInstruction(at address: OpaquePointer, state: BreakpointState) {
+		state.machineState.restoreOriginalInstruction(at: address)
     }
 
     public func removeBreakpoint(_ breakpoint: Breakpoint) throws {
@@ -220,7 +220,7 @@ public class Controller {
             breakpoints.updateValue(bp, forKey: breakpoint.address)
             return
         }
-		restoreBreakpointsOriginalInstruction((address: keyValue.key, keyValue.value))
+		restoreBreakpointsOriginalInstruction(at: keyValue.key, state: keyValue.value)
         breakpoints.remove(at: index)
         guard let address = breakpointLandingAddresses.removeValue(forKey: bp.landingAddress) else {
             assertionFailure()

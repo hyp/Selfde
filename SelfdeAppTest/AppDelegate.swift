@@ -49,7 +49,7 @@ func runSelfDebuggerTest() {
                 let sp = try thread.getStackPointer()
                 print("  Thread \(id): ip = \(ip), sp = \(sp)")
                 if thread == mainThread { // FIXME: this is a HACK.
-                    mainBreakpoint = try controller.installBreakpoint(breakpointAddress)
+                    mainBreakpoint = try controller.installBreakpoint(at: breakpointAddress)
                     if mainBreakpoint!.address != breakpointAddress {
                         fatalError()
                     }
@@ -92,7 +92,7 @@ func runSelfDebuggerTest() {
             if exception.thread != exception2.thread {
                 fatalError("Invalid thread!")
             }
-            let breakpoint2 = try controller.installBreakpoint(breakpointAddress)
+            let breakpoint2 = try controller.installBreakpoint(at: breakpointAddress)
             try exception2.thread.endSingleStepMode()
             try exception2.thread.resume()
 

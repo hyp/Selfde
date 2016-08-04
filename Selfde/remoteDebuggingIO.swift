@@ -19,7 +19,7 @@ public protocol RemoteDebuggingReader: class {
 }
 
 public protocol RemoteDebuggingWriter: class {
-    func write(_ data: ArraySlice<UInt8>) throws
+    func write(data: ArraySlice<UInt8>) throws
     func close()
 }
 
@@ -58,7 +58,7 @@ private final class RemoteDebuggingSocketWriter: RemoteDebuggingWriter {
         self.writeStream = writeStream
     }
 
-    func write(_ data: ArraySlice<UInt8>) throws {
+    func write(data: ArraySlice<UInt8>) throws {
         var buffer = data
         while !buffer.isEmpty {
             let writtenSize = buffer.withUnsafeBufferPointer {

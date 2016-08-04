@@ -53,8 +53,8 @@ class SelfdeTests: XCTestCase {
 
             // Install a breakpoint in that memory.
             do {
-                let bp0 = try controller.installBreakpoint(executableMemory)
-                let bp1 = try controller.installBreakpoint(executableMemory)
+                let bp0 = try controller.installBreakpoint(at: executableMemory)
+				let bp1 = try controller.installBreakpoint(at: executableMemory)
                 XCTAssertEqual(bp0.address, bp1.address)
                 try controller.removeBreakpoint(bp0)
             } catch {
@@ -327,7 +327,7 @@ class SelfdeTests: XCTestCase {
             func read() throws -> ArraySlice<UInt8> {
                 return []
             }
-            func write(_ data: ArraySlice<UInt8>) throws {
+            func write(data: ArraySlice<UInt8>) throws {
             }
             func close() {
             }

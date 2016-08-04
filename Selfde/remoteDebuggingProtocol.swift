@@ -265,7 +265,7 @@ struct PacketParser {
         return Address(bitPattern: address)
     }
 
-    private mutating func readHexBytes(_ endIndex: String.UnicodeScalarView.Index) -> [UInt8]? {
+    private mutating func readHexBytes(upTo endIndex: String.UnicodeScalarView.Index) -> [UInt8]? {
         var result = [UInt8]()
         while payload.index(after: index) < endIndex {
             guard let high = payload[index].hexValue, let low = payload[payload.index(after: index)].hexValue else {
@@ -280,10 +280,10 @@ struct PacketParser {
     }
 
     mutating func readHexBytes() -> [UInt8]? {
-        return readHexBytes(endIndex)
+		return readHexBytes(upTo: endIndex)
     }
 
-    mutating func readHexBytes(_ size: Int) -> [UInt8]? {
-        return readHexBytes(payload.index(index, offsetBy: size * 2))
+    mutating func readHexBytes(size: Int) -> [UInt8]? {
+		return readHexBytes(upTo: payload.index(index, offsetBy: size * 2))
     }
 }

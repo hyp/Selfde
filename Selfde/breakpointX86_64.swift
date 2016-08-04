@@ -15,11 +15,11 @@ struct BreakpointStateX86_64 {
         self.originalByte = originalByte
     }
 
-    func restoreOriginalInstruction(_ address: OpaquePointer) {
+    func restoreOriginalInstruction(at address: OpaquePointer) {
         UnsafeMutablePointer<UInt8>(address).pointee = originalByte
     }
 
-    static func create(_ address: OpaquePointer) -> (MachineBreakpointState, landingAddress: OpaquePointer) {
+    static func create(at address: OpaquePointer) -> (MachineBreakpointState, landingAddress: OpaquePointer) {
         let bytes = UnsafeMutablePointer<UInt8>(address)
         let result = MachineBreakpointState(originalByte: bytes.pointee)
         bytes.pointee = UInt8(0xCC) // INT 3.
