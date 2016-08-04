@@ -64,7 +64,7 @@ private func getRegisterEntries(_ registerSets: [DNBRegisterSetInfo]) -> [Regist
             var i = 0
             while entry.info.value_regs[i] != nil {
                 guard let name = String(validatingUTF8: entry.info.value_regs[i]!),
-                    number = nameToRegisterNumber[name] else {
+                    let number = nameToRegisterNumber[name] else {
                         assertionFailure()
                         break
                 }
@@ -89,7 +89,7 @@ private func getRegisterEntries(_ registerSets: [DNBRegisterSetInfo]) -> [Regist
             var i = 0
             while entry.info.update_regs[i] != nil {
                 guard let name = String(validatingUTF8: entry.info.update_regs[i]!),
-                    number = nameToRegisterNumber[name] else {
+                    let number = nameToRegisterNumber[name] else {
                         assertionFailure()
                         break
                 }
@@ -143,7 +143,7 @@ func handleQRegisterInfo(_ server: inout DebugServerState, payload: String) -> R
     if let name = String(validatingUTF8: register.info.name) {
         response += "name:\(name);"
     }
-    if let alt = register.info.alt, altName = String(validatingUTF8: alt) {
+    if let alt = register.info.alt, let altName = String(validatingUTF8: alt) {
         response += "alt-name:\(altName);"
     }
 

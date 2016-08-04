@@ -318,7 +318,7 @@ extension PacketParser {
 // -1: All, 0: Any, NNN: Thread ID.
 private func handleSetCurrentThread(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload, offset: 1)
-    guard let type = parser.consumeCharacter() where type == "c" || type == "g" else {
+    guard let type = parser.consumeCharacter(), type == "c" || type == "g" else {
         return .invalid("Missing type")
     }
     let thread: ThreadReference
@@ -455,7 +455,7 @@ private func handleStep(_ server: inout DebugServerState, payload: String) -> Re
 private func handleZ(_ server: inout DebugServerState, payload: String) -> ResponseResult {
     var parser = PacketParser(payload: payload)
     guard let command = parser.consumeCharacter(),
-        breakpointType = parser.consumeCharacter() else {
+        let breakpointType = parser.consumeCharacter() else {
             return .invalid("")
     }
     guard parser.consumeComma() else {
@@ -712,7 +712,7 @@ public class DebugServer {
     }
 
     func handleBinaryPacketPayload(_ payload: [UInt8]) -> ResponseResult {
-        guard let first = payload.first where first == UInt8(ascii: "X") else {
+        guard let first = payload.first, first == UInt8(ascii: "X") else {
             return .unimplemented
         }
         return handleBinaryMemoryWrite(&state, payload: payload)

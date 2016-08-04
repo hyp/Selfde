@@ -91,7 +91,7 @@ public func createRemoteDebuggingSocketConnection(_ hostAndPort: String) throws 
     var readStream: Unmanaged<CFReadStream>?
     var writeStream: Unmanaged<CFWriteStream>?
     CFStreamCreatePairWithSocketToHost(nil, host, UInt32(port), &readStream, &writeStream)
-    guard let read = readStream, write = writeStream else {
+    guard let read = readStream, let write = writeStream else {
         throw RemoteDebuggingIOError.streamOpenError
     }
     guard CFReadStreamOpen(read.takeUnretainedValue()) && CFWriteStreamOpen(write.takeUnretainedValue()) else {

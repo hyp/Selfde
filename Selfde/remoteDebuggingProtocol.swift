@@ -135,7 +135,7 @@ private func extractPayloadPacket(_ data: ArraySlice<UInt8>, checkChecksums: Boo
     if checkChecksums {
         assert(checksumInfo.count == 3)
         let checksumString = String(UnicodeScalar(checksumInfo[(checksumInfo.startIndex + 1)])) + String(UnicodeScalar(checksumInfo[checksumInfo.startIndex.advanced(by: 2)]))
-        guard let checksum = Int(checksumString, radix: 16) where checksumInfo[checksumInfo.startIndex] == UInt8(ascii: "#") else {
+        guard let checksum = Int(checksumString, radix: 16), checksumInfo[checksumInfo.startIndex] == UInt8(ascii: "#") else {
             return .invalidPacket
         }
 
@@ -146,7 +146,7 @@ private func extractPayloadPacket(_ data: ArraySlice<UInt8>, checkChecksums: Boo
     }
 
     // Return the payload.
-    if let first = payload.first where first == UInt8(ascii: "X") {
+    if let first = payload.first, first == UInt8(ascii: "X") {
         // Binary writes need a binary payload.
         return .binaryPayload(Array(payload))
     }

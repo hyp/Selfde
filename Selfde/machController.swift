@@ -51,7 +51,7 @@ public class Controller {
                 return
             }
         }
-        if let thread = utilityThread where !thread.isFinished {
+        if let thread = utilityThread, !thread.isFinished {
             if thread_terminate(utilityThreadPort) != KERN_SUCCESS {
                 return
             }
