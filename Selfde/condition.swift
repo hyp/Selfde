@@ -5,7 +5,7 @@
 
 import Foundation
 
-func throwIfNeeded(posixError error: Int32) throws {
+private func throwIfNeeded(posixError error: Int32) throws {
     if error != 0 {
         throw NSError(domain: NSPOSIXErrorDomain, code: Int(error), userInfo: nil)
     }
