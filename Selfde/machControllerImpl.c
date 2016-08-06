@@ -73,11 +73,11 @@ static void *exceptionHandlerThreadMain(void *arg) {
             continue;
         }
         // Dispatch the message.
-        pthread_mutex_lock(&state->synchronisationMutex);
+        pthread_mutex_lock(state->synchronisationMutex);
         state->caughtException = *exception;
         state->hasCaughtException = true;
-        pthread_cond_signal(&state->synchronisationCondition);
-        pthread_mutex_unlock(&state->synchronisationMutex);
+        pthread_cond_signal(state->synchronisationCondition);
+        pthread_mutex_unlock(state->synchronisationMutex);
     }
 }
 

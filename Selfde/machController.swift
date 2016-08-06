@@ -16,6 +16,7 @@ public struct ControllerInterrupter {
 
 /// Implements the Selfde controller for a process running on a Mach kernel.
 public class Controller {
+    private let conditionLock: Condition
     private var state: SelfdeMachControllerState
     private var hasInterrupt: Bool = false
     private var utilityThreadPort: mach_port_t // Can be used for things like listening for remote debugging commands.
@@ -35,13 +36,9 @@ public class Controller {
 
     init() throws {
         // Create the synchronisation primitives.
-        var condition = pthread_cond_t()
-        try handlePosixError(pthread_cond_init(&condition, nil))
-        var mutex = pthread_mutex_t()
-        try handlePosixError(pthread_mutex_init(&mutex, nil))
-
+        conditionLock = try Condition()
         let thread = mach_thread_self()
-        state = SelfdeMachControllerState(task: getMachTaskSelf(), controllerThread: thread, msgServerThread: thread, exceptionPort: 0, synchronisationCondition: condition, synchronisationMutex: mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
+        state = SelfdeMachControllerState(task: getMachTaskSelf(), controllerThread: thread, msgServerThread: thread, exceptionPort: 0, synchronisationCondition: conditionLock.cond, synchronisationMutex: conditionLock.mutex, caughtException: SelfdeCaughtMachException(thread: 0, exceptionType: 0, exceptionData: nil, exceptionDataSize: 0), hasCaughtException: false)
         utilityThreadPort = thread
     }
 
@@ -57,8 +54,9 @@ public class Controller {
             }
             utilityThread = nil
         }
-        pthread_mutex_destroy(&state.synchronisationMutex)
-        pthread_cond_destroy(&state.synchronisationCondition)
+        // conditionLock won't be deallocated before the end of deinit therefore its OK
+        // to just kill the threads that use it and then deallocate it as those threads
+        // won't be able to refer to it anymore.
     }
 
     /// Starts a thread that listens for exceptions like breakpoints for
@@ -75,11 +73,11 @@ public class Controller {
     }
 
     private func interrupt(_ function: @noescape () -> ()) {
-        pthread_mutex_lock(&state.synchronisationMutex)
+        conditionLock.lock()
         hasInterrupt = true
         function()
-        pthread_cond_signal(&state.synchronisationCondition)
-        pthread_mutex_unlock(&state.synchronisationMutex)
+        conditionLock.signal()
+        conditionLock.unlock()
     }
 
     public func runUtilityThread(_ function: (ControllerInterrupter) -> ()) {
@@ -104,24 +102,26 @@ public class Controller {
         utilityThread = thread
         assert(hasInterrupt == false)
         thread.start()
-        pthread_mutex_lock(&state.synchronisationMutex)
+
+        // Wait for the utility thread to interrupt us so that we know its mach port.
+        conditionLock.lock()
         while !hasInterrupt {
-            pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
+            conditionLock.wait()
         }
         hasInterrupt = false
-        pthread_mutex_unlock(&state.synchronisationMutex)
+        conditionLock.unlock()
     }
 
     public func waitForEvent(interruptHandler: (() -> ())? = nil) throws -> ControllerEvent {
-        pthread_mutex_lock(&state.synchronisationMutex)
+        conditionLock.lock()
         while !state.hasCaughtException && !hasInterrupt {
-            pthread_cond_wait(&state.synchronisationCondition, &state.synchronisationMutex)
+            conditionLock.wait()
         }
         guard state.hasCaughtException else {
             assert(hasInterrupt)
             interruptHandler?()
             hasInterrupt = false
-            pthread_mutex_unlock(&state.synchronisationMutex)
+            conditionLock.unlock()
             return .interrupted
         }
         let data = UnsafeMutableBufferPointer<mach_exception_data_type_t>(start: state.caughtException.exceptionData, count: Int(state.caughtException.exceptionDataSize))
@@ -129,7 +129,7 @@ public class Controller {
         state.hasCaughtException = false
         hasInterrupt = false
         free(state.caughtException.exceptionData)
-        pthread_mutex_unlock(&state.synchronisationMutex)
+        conditionLock.unlock()
         try handleException(result)
         return .caughtException(result)
     }

@@ -22,6 +22,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		FA0D85521D55D0DB00653715 /* condition.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D85511D55D0DB00653715 /* condition.swift */; };
 		FA1FB8BF1C8395A600505EC1 /* remoteDebuggingIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1FB8BE1C8395A600505EC1 /* remoteDebuggingIO.swift */; };
 		FA5DB8D01C848CAE0030E73C /* debuggerUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5DB8CF1C848CAE0030E73C /* debuggerUtils.swift */; };
 		FA68DF3E1C79BDEF00F3D838 /* Selfde.h in Headers */ = {isa = PBXBuildFile; fileRef = FA68DF3D1C79BDEF00F3D838 /* Selfde.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -102,6 +103,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FA0D85511D55D0DB00653715 /* condition.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = condition.swift; sourceTree = "<group>"; };
 		FA1FB8BE1C8395A600505EC1 /* remoteDebuggingIO.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = remoteDebuggingIO.swift; sourceTree = "<group>"; };
 		FA5DB8CF1C848CAE0030E73C /* debuggerUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = debuggerUtils.swift; sourceTree = "<group>"; };
 		FA68DF3A1C79BDEF00F3D838 /* Selfde.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Selfde.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -167,6 +169,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FA0D85501D55D0CB00653715 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				FA0D85511D55D0DB00653715 /* condition.swift */,
+			);
+			name = Core;
+			sourceTree = "<group>";
+		};
 		FA68DF301C79BDEF00F3D838 = {
 			isa = PBXGroup;
 			children = (
@@ -190,6 +200,7 @@
 		FA68DF3C1C79BDEF00F3D838 /* Selfde */ = {
 			isa = PBXGroup;
 			children = (
+				FA0D85501D55D0CB00653715 /* Core */,
 				FA68DF3D1C79BDEF00F3D838 /* Selfde.h */,
 				FA68DF3F1C79BDEF00F3D838 /* Info.plist */,
 				FA68DF541C79BDFB00F3D838 /* controller.swift */,
@@ -443,6 +454,7 @@
 				FAF7BA791C7B10B500883782 /* breakpointX86_64.swift in Sources */,
 				FAF7BA7B1C7B152C00883782 /* machRegisterSetsX86_64.swift in Sources */,
 				FA68DF5A1C79CB6900F3D838 /* machControllerImpl.c in Sources */,
+				FA0D85521D55D0DB00653715 /* condition.swift in Sources */,
 				FAF7BA741C7B06CA00883782 /* machThreadX86_64.swift in Sources */,
 				FA68DF571C79C9F800F3D838 /* machController.swift in Sources */,
 				FA707ED91C809D1200BB06A0 /* debugServer.swift in Sources */,

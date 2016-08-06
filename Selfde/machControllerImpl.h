@@ -26,8 +26,8 @@ typedef struct SelfdeMachControllerState {
     mach_port_t controllerThread;
     mach_port_t msgServerThread;
     mach_port_t exceptionPort;
-    pthread_cond_t synchronisationCondition;
-    pthread_mutex_t synchronisationMutex;
+    pthread_cond_t *synchronisationCondition;
+    pthread_mutex_t *synchronisationMutex;
     SelfdeCaughtMachException caughtException;
     bool hasCaughtException;
 } SelfdeMachControllerState;
