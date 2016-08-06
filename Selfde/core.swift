@@ -7,11 +7,37 @@ import Foundation
 
 public typealias ThreadID = UInt64
 
+public struct Address: Equatable, Hashable {
+    // In-process, thus same width.
+    public let bitPattern: UInt
+
+    public init(bitPattern: UInt) {
+        self.bitPattern = bitPattern
+    }
+    public var hashValue: Int {
+        return bitPattern.hashValue
+    }
+}
+
+#if arch(x86_64)
+
+public extension Address {
+    init(bitPattern64: UInt64) {
+        bitPattern = UInt(bitPattern64)
+    }
+
+    var bitPattern64: UInt64 {
+        return UInt64(bitPattern)
+    }
+}
+
+#endif
+
 public struct Breakpoint {
     // Breakpoint's address.
-    public let address: OpaquePointer
+    public let address: Address
 
-    public init(address: OpaquePointer) {
+    public init(address: Address) {
         self.address = address
     }
 }

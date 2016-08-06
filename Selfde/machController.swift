@@ -23,16 +23,16 @@ public class Controller {
     private var utilityThread: Foundation.Thread?
     private struct BreakpointState {
         let machineState: MachineBreakpointState
-        let landingAddress: OpaquePointer
+        let landingAddress: Address
         var counter: Int
     }
-    private var breakpoints: [OpaquePointer: BreakpointState] = [:]
-    private var breakpointLandingAddresses: [OpaquePointer: OpaquePointer] = [:]
+    private var breakpoints: [Address: BreakpointState] = [:]
+    private var breakpointLandingAddresses: [Address: Address] = [:]
     private struct AllocationState {
         let address: mach_vm_address_t
         let size: mach_vm_size_t
     }
-    private var allocations: [OpaquePointer: AllocationState] = [:]
+    private var allocations: [Address: AllocationState] = [:]
 
     init() throws {
         // Create the synchronisation primitives.
@@ -147,14 +147,14 @@ public class Controller {
         try exception.thread.setInstructionPointer(address)
     }
 
-    public func getSharedLibraryInfoAddress() throws -> OpaquePointer {
+    public func getSharedLibraryInfoAddress() throws -> Address {
         var dyldInfo = task_dyld_info()
         var count = mach_msg_type_number_t(sizeof(task_dyld_info.self) / sizeof(Int32.self))
         let error = withUnsafeMutablePointer(&dyldInfo) {
             task_info(self.state.task, task_flavor_t(TASK_DYLD_INFO), UnsafeMutablePointer<integer_t>($0), &count)
         }
         try handleError(error)
-        return OpaquePointer(bitPattern: UInt(dyldInfo.all_image_info_addr))!
+        return Address(bitPattern: UInt(dyldInfo.all_image_info_addr))
     }
 
     public func suspendThreads() throws {
@@ -185,12 +185,12 @@ public class Controller {
     }
 
     /// Gives the given memory ALL protections.
-    private func memoryProtectAll(_ address: OpaquePointer, size: vm_size_t) throws {
-        let addr = vm_address_t(unsafeBitCast(address, to: UInt.self))
+    private func memoryProtectAll(_ address: Address, size: vm_size_t) throws {
+        let addr = vm_address_t(address.bitPattern)
         try handleError(vm_protect(state.task, addr, size, boolean_t(0), getVMProtAll()))
     }
 
-    public func installBreakpoint(at address: OpaquePointer) throws -> Breakpoint {
+    public func installBreakpoint(at address: Address) throws -> Breakpoint {
         if let index = breakpoints.index(forKey: address) {
             var bp = breakpoints[index].1
             bp.counter += 1
@@ -205,7 +205,7 @@ public class Controller {
         return Breakpoint(address: address)
     }
 
-	private func restoreBreakpointsOriginalInstruction(at address: OpaquePointer, state: BreakpointState) {
+	private func restoreBreakpointsOriginalInstruction(at address: Address, state: BreakpointState) {
 		state.machineState.restoreOriginalInstruction(at: address)
     }
 
@@ -229,7 +229,7 @@ public class Controller {
         assert(address == breakpoint.address)
     }
 
-    public func allocate(_ size: Int, permissions: MemoryPermissions) throws -> OpaquePointer {
+    public func allocate(_ size: Int, permissions: MemoryPermissions) throws -> Address {
         var address = mach_vm_address_t()
         let allocationSize = mach_vm_size_t(size)
         try handleError(mach_vm_allocate(state.task, &address, allocationSize, 1))
@@ -249,12 +249,12 @@ public class Controller {
             mach_vm_deallocate(state.task, address, allocationSize)
             throw error
         }
-        let result = OpaquePointer(bitPattern: UInt(address))!
+        let result = Address(bitPattern: UInt(address))
         allocations[result] = AllocationState(address: address, size: allocationSize)
         return result
     }
 
-    public func deallocate(_ address: OpaquePointer) throws {
+    public func deallocate(_ address: Address) throws {
         guard let allocation = allocations[address] else {
             throw ControllerError.invalidAllocation
         }

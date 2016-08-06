@@ -33,7 +33,7 @@ func runSelfDebuggerTest() {
     print("Main thread: \(mainThread.threadID)")
     // Used to signal the main thread that the breakpoint is installed.
     let semaphore = DispatchSemaphore(value: 0)
-    let breakpointAddress = OpaquePointer(getTestFunctionAddress())!
+    let breakpointAddress = Address(bitPattern: unsafeBitCast(getTestFunctionAddress(), to: UInt.self))
 
     runSelfdeController ({ controller in
         print("Reached callback")

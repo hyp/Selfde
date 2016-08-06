@@ -7,15 +7,6 @@ public enum MemoryReadResult {
     case bytes(UnsafeBufferPointer<UInt8>)
 }
 
-public struct Address: Equatable {
-    // In-process, thus same width.
-    public let bitPattern: UInt
-
-    public init(bitPattern: UInt) {
-        self.bitPattern = bitPattern
-    }
-}
-
 public func == (lhs: Address, rhs: Address) -> Bool {
     return lhs.bitPattern == rhs.bitPattern
 }

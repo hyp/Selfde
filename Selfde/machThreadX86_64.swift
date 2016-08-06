@@ -7,16 +7,6 @@ import Darwin.Mach
 
 #if arch(x86_64) // TODO: i386 support
 
-private extension OpaquePointer {
-    init(bitPattern64: UInt64) {
-        self.init(bitPattern: UInt(bitPattern64))!
-    }
-
-    var bitPattern64: UInt64 {
-        return unsafeBitCast(self, to: UInt64.self)
-    }
-}
-
 private func getStateCount<T>(_ state: T) -> mach_msg_type_number_t {
     return mach_msg_type_number_t(sizeofValue(state) / sizeof(Int32.self))
 }
@@ -91,18 +81,18 @@ struct MachThreadX86_64 {
         try setState(&state)
     }
 
-    func getInstructionPointer() throws -> OpaquePointer {
-        return OpaquePointer(bitPattern64: try getGPRState().__rip)
+    func getInstructionPointer() throws -> Address {
+        return Address(bitPattern64: try getGPRState().__rip)
     }
 
-    func setInstructionPointer(_ address: OpaquePointer) throws {
+    func setInstructionPointer(_ address: Address) throws {
         var state = try getGPRState()
         state.__rip = address.bitPattern64
         try setGPRState(&state)
     }
 
-    func getStackPointer() throws -> OpaquePointer {
-        return OpaquePointer(bitPattern64: try getGPRState().__rsp)
+    func getStackPointer() throws -> Address {
+        return Address(bitPattern64: try getGPRState().__rsp)
     }
 
     func getRegisterValue(_ id: UInt32, setID: UInt32, dest: inout [UInt8]) throws -> ArraySlice<UInt8> {

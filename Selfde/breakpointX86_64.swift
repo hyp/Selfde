@@ -15,15 +15,15 @@ struct BreakpointStateX86_64 {
         self.originalByte = originalByte
     }
 
-    func restoreOriginalInstruction(at address: OpaquePointer) {
-        UnsafeMutablePointer<UInt8>(address).pointee = originalByte
+    func restoreOriginalInstruction(at address: Address) {
+        UnsafeMutablePointer<UInt8>(bitPattern: address.bitPattern)!.pointee = originalByte
     }
 
-    static func create(at address: OpaquePointer) -> (MachineBreakpointState, landingAddress: OpaquePointer) {
-        let bytes = UnsafeMutablePointer<UInt8>(address)
+    static func create(at address: Address) -> (MachineBreakpointState, landingAddress: Address) {
+        let bytes = UnsafeMutablePointer<UInt8>(bitPattern: address.bitPattern)!
         let result = MachineBreakpointState(originalByte: bytes.pointee)
         bytes.pointee = UInt8(0xCC) // INT 3.
-        return (result, landingAddress: OpaquePointer(bytes.successor()))
+        return (result, landingAddress: Address(bitPattern: address.bitPattern + 1))
     }
 
     // The number of bytes that have to be modified after the address in order to install a breakpoint.

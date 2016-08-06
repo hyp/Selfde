@@ -36,7 +36,7 @@ class SelfdeTests: XCTestCase {
             }
 
             // Allocate an executable memory region.
-            let executableMemory: OpaquePointer
+            let executableMemory: Address
             do {
                 executableMemory = try controller.allocate(1024, permissions: [.read, .write, .execute])
             } catch {
@@ -87,7 +87,7 @@ class SelfdeTests: XCTestCase {
             }
 
             // Suspend the thread and jump to the executable region with the breakpoint.
-            let previousIP: OpaquePointer
+            let previousIP: Address
             do {
                 let state = try mainThread.getRunState()
                 XCTAssertEqual(state, RunState.running)

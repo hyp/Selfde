@@ -31,15 +31,15 @@ public struct Thread {
         impl = MachMachineThread(thread: value)
     }
 
-    public func getInstructionPointer() throws -> OpaquePointer {
+    public func getInstructionPointer() throws -> Address {
         return try impl.getInstructionPointer()
     }
 
-    public func setInstructionPointer(_ address: OpaquePointer) throws {
+    public func setInstructionPointer(_ address: Address) throws {
         try impl.setInstructionPointer(address)
     }
 
-    public func getStackPointer() throws -> OpaquePointer {
+    public func getStackPointer() throws -> Address {
         return try impl.getStackPointer()
     }
 
@@ -130,7 +130,7 @@ public struct Thread {
         }
     }
 
-    public func getDispatchQueueAddress() throws -> OpaquePointer {
-        return OpaquePointer(bitPattern: UInt(try getIdentifierInfo().dispatch_qaddr))!
+    public func getDispatchQueueAddress() throws -> Address {
+        return Address(bitPattern: UInt(try getIdentifierInfo().dispatch_qaddr))
     }
 }
