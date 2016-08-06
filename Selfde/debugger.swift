@@ -3,10 +3,6 @@
 //  Selfde
 //
 
-public enum MemoryReadResult {
-    case bytes(UnsafeBufferPointer<UInt8>)
-}
-
 public enum ThreadReference {
     case id(ThreadID) // NNN
     case any          // 0

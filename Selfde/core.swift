@@ -64,3 +64,7 @@ public enum RunState {
     case uninterruptible
     case halted
 }
+
+public enum MemoryReadResult {
+    case bytes(UnsafeBufferPointer<UInt8>)
+}

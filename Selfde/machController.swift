@@ -260,4 +260,21 @@ public class Controller {
         }
         try handleError(mach_vm_deallocate(state.task, allocation.address, allocation.size))
     }
+
+    public func read(at address: Address, size: Int) throws -> MemoryReadResult {
+        guard let basePointer = UnsafePointer<UInt8>(bitPattern: address.bitPattern) else {
+            throw ControllerError.invalidAddress
+        }
+        return .bytes(UnsafeBufferPointer(start: basePointer, count: size))
+    }
+
+    public func write(bytes: [UInt8], to address: Address) throws {
+        guard let basePointer = UnsafeMutablePointer<UInt8>(bitPattern: address.bitPattern) else {
+            throw ControllerError.invalidAddress
+        }
+        let dest = UnsafeMutableBufferPointer(start: basePointer, count: bytes.count)
+        for (i, byte) in bytes.enumerated() {
+            dest[i] = byte
+        }
+    }
 }

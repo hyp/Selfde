@@ -14,6 +14,7 @@ public enum ControllerError: Error {
     case invalidRegisterSetID
     case registerBufferIsTooSmall
     case invalidAllocation
+    case invalidAddress
 }
 
 public enum ControllerEvent {
