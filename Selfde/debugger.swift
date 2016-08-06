@@ -7,10 +7,6 @@ public enum MemoryReadResult {
     case bytes(UnsafeBufferPointer<UInt8>)
 }
 
-public func == (lhs: Address, rhs: Address) -> Bool {
-    return lhs.bitPattern == rhs.bitPattern
-}
-
 public enum ThreadReference {
     case id(ThreadID) // NNN
     case any          // 0

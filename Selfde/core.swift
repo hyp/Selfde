@@ -19,6 +19,10 @@ public struct Address: Equatable, Hashable {
     }
 }
 
+public func == (lhs: Address, rhs: Address) -> Bool {
+    return lhs.bitPattern == rhs.bitPattern
+}
+
 #if arch(x86_64)
 
 public extension Address {
