@@ -38,7 +38,7 @@ class SelfdeTests: XCTestCase {
             // Allocate an executable memory region.
             let executableMemory: OpaquePointer
             do {
-                executableMemory = try controller.allocate(1024, permissions: [.Read, .Write, .Execute])
+                executableMemory = try controller.allocate(1024, permissions: [.read, .write, .execute])
             } catch {
                 XCTFail()
                 return
@@ -139,32 +139,32 @@ class SelfdeTests: XCTestCase {
 
     func testMemoryPermissionBug() {
         do {
-            let p: MemoryPermissions = [.Read]
+            let p: MemoryPermissions = [.read]
             XCTAssertNotEqual(p.rawValue, 0)
-            XCTAssert(p.contains(.Read))
-            XCTAssertFalse(p.contains(.Write))
-            XCTAssertFalse(p.contains(.Execute))
+            XCTAssert(p.contains(.read))
+            XCTAssertFalse(p.contains(.write))
+            XCTAssertFalse(p.contains(.execute))
         }
         do {
-            let p: MemoryPermissions = [.Write]
+            let p: MemoryPermissions = [.write]
             XCTAssertNotEqual(p.rawValue, 0)
-            XCTAssert(p.contains(.Write))
-            XCTAssertFalse(p.contains(.Read))
-            XCTAssertFalse(p.contains(.Execute))
+            XCTAssert(p.contains(.write))
+            XCTAssertFalse(p.contains(.read))
+            XCTAssertFalse(p.contains(.execute))
         }
         do {
-            let p: MemoryPermissions = [.Execute]
+            let p: MemoryPermissions = [.execute]
             XCTAssertNotEqual(p.rawValue, 0)
-            XCTAssert(p.contains(.Execute))
-            XCTAssertFalse(p.contains(.Read))
-            XCTAssertFalse(p.contains(.Write))
+            XCTAssert(p.contains(.execute))
+            XCTAssertFalse(p.contains(.read))
+            XCTAssertFalse(p.contains(.write))
         }
         do {
-            let p: MemoryPermissions = [.Read, .Write]
+            let p: MemoryPermissions = [.read, .write]
             XCTAssertNotEqual(p.rawValue, 0)
-            XCTAssertFalse(p.contains(.Execute))
-            XCTAssert(p.contains(.Read))
-            XCTAssert(p.contains(.Write))
+            XCTAssertFalse(p.contains(.execute))
+            XCTAssert(p.contains(.read))
+            XCTAssert(p.contains(.write))
         }
     }
 
@@ -520,7 +520,7 @@ class SelfdeTests: XCTestCase {
             return result
         }
 
-        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.Read, MemoryPermissions.Write]), (0x1234567812345678, [MemoryPermissions.Read, MemoryPermissions.Write, MemoryPermissions.Execute])], expectedDeallocates: [Address(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11), (0xA0B, 4), (0x4040, 256)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34]), (0xBeef, [0,7,0xAA,0xBB,1,2,3,4])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)],
+        let server = DebugServer(debugger: MockDebugger(expectedSetBreakpoints: [(0xABA, 1), (0xBAA, 255)], expectedAllocates: [(0x104, [MemoryPermissions.read, MemoryPermissions.write]), (0x1234567812345678, [MemoryPermissions.read, MemoryPermissions.write, MemoryPermissions.execute])], expectedDeallocates: [Address(bitPattern: 0xadbeef)], expectedMemoryReads: [(0xA0B, 4), (0x123456789, 0x11), (0xA0B, 4), (0x4040, 256)], expectedMemoryWrites: [(0xBeef, [0,7,0xAA,0xBB,0xCC,0xEE,0x12,0x34]), (0xBeef, [0,7,0xAA,0xBB,1,2,3,4])], expectedRegisterReads: [(0xc, 0, 1, 0), (0xa2a, 0, 1, 2), (0xa2a, 0x10, 1, 0x4091), (0, 0xf, 1, UInt64.max)], expectedRegisterWrites: [(0x808, 0, 1, 0xefcdab78563412), (0x808, 0xa, 1, 0x1000000000000000), (0x71f, 3, 1, UInt64.max), (0x808, 0x11, 1, 2)],
             expectedRegisterContextReads: [
                 (0x42, registerContext([2, UInt64.max, 0x4091])),
                 (0x42, registerContext([2, UInt64.max, 0x4091])),

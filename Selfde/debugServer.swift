@@ -262,11 +262,11 @@ private func handleAllocate(_ server: inout DebugServerState, payload: String) -
     while let a = parser.consumeCharacter() {
         switch a {
         case "r":
-            permissions.insert(.Read)
+            permissions.insert(.read)
         case "w":
-            permissions.insert(.Write)
+            permissions.insert(.write)
         case "x":
-            permissions.insert(.Execute)
+            permissions.insert(.execute)
         default:
             return .error(.e53)
         }

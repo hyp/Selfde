@@ -234,13 +234,13 @@ public class Controller {
         let allocationSize = mach_vm_size_t(size)
         try handleError(mach_vm_allocate(state.task, &address, allocationSize, 1))
         var protection: vm_prot_t = 0
-        if permissions.contains(.Read) {
+        if permissions.contains(.read) {
             protection |= getVMProtRead()
         }
-        if permissions.contains(.Write) {
+        if permissions.contains(.write) {
             protection |= getVMProtWrite()
         }
-        if permissions.contains(.Execute) {
+        if permissions.contains(.execute) {
             protection |= getVMProtExecute()
         }
         do {

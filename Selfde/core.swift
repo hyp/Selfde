@@ -21,9 +21,9 @@ public struct MemoryPermissions: OptionSet {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
 
-    public static let Read = MemoryPermissions(rawValue: 1)
-    public static let Write = MemoryPermissions(rawValue: 2)
-    public static let Execute = MemoryPermissions(rawValue: 4)
+    public static let read = MemoryPermissions(rawValue: 1)
+    public static let write = MemoryPermissions(rawValue: 2)
+    public static let execute = MemoryPermissions(rawValue: 4)
 }
 
 // Thread's run state.
