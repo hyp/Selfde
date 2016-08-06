@@ -137,6 +137,37 @@ class SelfdeTests: XCTestCase {
         XCTAssertEqual(f, 5002.0)
     }
 
+    func testMemoryPermissionBug() {
+        do {
+            let p: MemoryPermissions = [.Read]
+            XCTAssertNotEqual(p.rawValue, 0)
+            XCTAssert(p.contains(.Read))
+            XCTAssertFalse(p.contains(.Write))
+            XCTAssertFalse(p.contains(.Execute))
+        }
+        do {
+            let p: MemoryPermissions = [.Write]
+            XCTAssertNotEqual(p.rawValue, 0)
+            XCTAssert(p.contains(.Write))
+            XCTAssertFalse(p.contains(.Read))
+            XCTAssertFalse(p.contains(.Execute))
+        }
+        do {
+            let p: MemoryPermissions = [.Execute]
+            XCTAssertNotEqual(p.rawValue, 0)
+            XCTAssert(p.contains(.Execute))
+            XCTAssertFalse(p.contains(.Read))
+            XCTAssertFalse(p.contains(.Write))
+        }
+        do {
+            let p: MemoryPermissions = [.Read, .Write]
+            XCTAssertNotEqual(p.rawValue, 0)
+            XCTAssertFalse(p.contains(.Execute))
+            XCTAssert(p.contains(.Read))
+            XCTAssert(p.contains(.Write))
+        }
+    }
+
     func testRemoteDebuggingProtocol() {
         XCTAssertEqual(UnicodeScalar("0").hexValue, 0)
         XCTAssertEqual(UnicodeScalar("a").hexValue, 10)

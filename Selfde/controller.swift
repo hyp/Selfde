@@ -35,7 +35,7 @@ public struct Breakpoint {
 // Read/Write/Execute memory permissions.
 public struct MemoryPermissions: OptionSetType {
     public let rawValue: Int
-    public init(rawValue: Int) { self.rawValue = 0 }
+    public init(rawValue: Int) { self.rawValue = rawValue }
 
     public static let Read = MemoryPermissions(rawValue: 1)
     public static let Write = MemoryPermissions(rawValue: 2)
