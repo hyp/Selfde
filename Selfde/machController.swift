@@ -172,16 +172,21 @@ public class Controller {
     }
 
     public func getThreads() throws -> [Thread] {
-        var threads = thread_act_port_array_t(bitPattern: 0)
+        var threadsPtr = thread_act_port_array_t(bitPattern: 0)
         var count = mach_msg_type_number_t(0)
-        try handleError(task_threads(state.task, &threads, &count))
+        try handleError(task_threads(state.task, &threadsPtr, &count))
+        guard let threads = threadsPtr else {
+            assert(count == 0)
+            assertionFailure("Failed to get task's threads")
+            return []
+        }
         var result = [Thread]()
         for i in 0..<count {
-            let thread = threads?[Int(i)]
+            let thread = threads[Int(i)]
             if thread == state.controllerThread || thread == state.msgServerThread || thread == utilityThreadPort {
                 continue;
             }
-            result.append(Thread(thread!))
+            result.append(Thread(thread))
         }
         return result
     }
