@@ -600,7 +600,7 @@ private func handleQProcessInfo(_ server: inout DebugServerState, payload: Strin
     var processInfo = kinfo_proc()
     var processInfoSize = MemoryLayout<kinfo_proc>.size
     if processInfoRequest.withUnsafeMutableBufferPointer({ (requestPtr: inout UnsafeMutableBufferPointer<Int32>) in
-		withUnsafeMutablePointer(to: &processInfo) { infoPtr in
+        withUnsafeMutablePointer(to: &processInfo) { infoPtr in
             sysctl(requestPtr.baseAddress, 4, infoPtr, &processInfoSize, nil, 0)
         }
     }) == 0 && processInfoSize > 0 {

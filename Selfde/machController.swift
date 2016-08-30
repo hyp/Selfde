@@ -207,8 +207,8 @@ public class Controller {
         return Breakpoint(address: address)
     }
 
-	private func restoreBreakpointsOriginalInstruction(at address: Address, state: BreakpointState) {
-		state.machineState.restoreOriginalInstruction(at: address)
+    private func restoreBreakpointsOriginalInstruction(at address: Address, state: BreakpointState) {
+        state.machineState.restoreOriginalInstruction(at: address)
     }
 
     public func removeBreakpoint(_ breakpoint: Breakpoint) throws {
@@ -222,7 +222,7 @@ public class Controller {
             breakpoints.updateValue(bp, forKey: breakpoint.address)
             return
         }
-		restoreBreakpointsOriginalInstruction(at: keyValue.key, state: keyValue.value)
+        restoreBreakpointsOriginalInstruction(at: keyValue.key, state: keyValue.value)
         breakpoints.remove(at: index)
         guard let address = breakpointLandingAddresses.removeValue(forKey: bp.landingAddress) else {
             assertionFailure()
