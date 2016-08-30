@@ -8,7 +8,7 @@ import Darwin.Mach
 #if arch(x86_64) // TODO: i386 support
 
 private func getStateCount<T>(_ state: T) -> mach_msg_type_number_t {
-    return mach_msg_type_number_t(sizeofValue(state) / sizeof(Int32.self))
+    return mach_msg_type_number_t(MemoryLayout<T>.size / MemoryLayout<Int32>.size)
 }
 
 typealias MachMachineThread = MachThreadX86_64
@@ -20,7 +20,7 @@ struct MachThreadX86_64 {
 
     private func getState<T: MachFlavouredState>(_ state: inout T) throws {
         var count = getStateCount(state)
-        try handleError(withUnsafeMutablePointer(&state) { pointer in
+        try handleError(withUnsafeMutablePointer(to: &state) { pointer in
             let statePtr = thread_state_t(OpaquePointer(pointer))
             return thread_get_state(thread, T.flavour, statePtr, &count)
         })
@@ -28,7 +28,7 @@ struct MachThreadX86_64 {
 
     private func setState<T: MachFlavouredState>(_ state: inout T) throws {
         let count = getStateCount(state)
-        try handleError(withUnsafeMutablePointer(&state) { pointer in
+        try handleError(withUnsafeMutablePointer(to: &state) { pointer in
             let statePtr = thread_state_t(OpaquePointer(pointer))
             return thread_set_state(thread, T.flavour, statePtr, count)
         })

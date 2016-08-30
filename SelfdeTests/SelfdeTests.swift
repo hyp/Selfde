@@ -462,7 +462,9 @@ class SelfdeTests: XCTestCase {
                 XCTAssertEqual(value.1, registerID)
                 XCTAssertEqual(value.2, registerSetID)
                 dest.withUnsafeMutableBufferPointer { (ptr: inout UnsafeMutableBufferPointer<UInt8>) in
-                    UnsafeMutablePointer<UInt64>(ptr.baseAddress!).pointee = value.3
+                    ptr.baseAddress!.withMemoryRebound(to: UInt64.self, capacity: 1) {
+                        $0.pointee = value.3
+                    }
                 }
                 return dest.prefix(8)
             }
@@ -477,14 +479,16 @@ class SelfdeTests: XCTestCase {
                 XCTAssertEqual(value.1, registerID)
                 XCTAssertEqual(value.2, registerSetID)
                 let val = source.withUnsafeBufferPointer {
-                    UnsafePointer<UInt64>($0.baseAddress!).pointee
+                    $0.baseAddress!.withMemoryRebound(to: UInt64.self, capacity: 1) {
+                        $0.pointee
+                    }
                 }
                 XCTAssertEqual(value.3, val)
             }
             #endif
 
             var registerContextSize: Int {
-                return sizeof(UInt64) * 3
+                return MemoryLayout<UInt64>.size * 3
             }
         
             func getRegisterContextForThread(_ threadID: ThreadID, dest: inout [UInt8]) throws -> ArraySlice<UInt8> {
@@ -511,10 +515,12 @@ class SelfdeTests: XCTestCase {
         }
 
         func registerContext(_ registers: [UInt64]) -> [UInt8] {
-            var result = [UInt8](repeating: 0, count: registers.count * sizeof(UInt64))
+            var result = [UInt8](repeating: 0, count: registers.count * MemoryLayout<UInt64>.size)
             registers.withUnsafeBufferPointer { ptr in
-                for (i, byte) in UnsafeMutableBufferPointer(start: UnsafeMutablePointer<UInt8>(ptr.baseAddress), count: result.count).enumerated() {
-                    result[i] = byte
+                ptr.baseAddress!.withMemoryRebound(to: UInt8.self, capacity: result.count) {
+                    for (i, byte) in UnsafeMutableBufferPointer(start: $0, count: result.count).enumerated() {
+                        result[i] = byte
+                    }
                 }
             }
             return result
@@ -740,7 +746,9 @@ class SelfdeTests: XCTestCase {
 
                 override func getRegisterValueForThread(_ threadID: ThreadID, registerID: UInt32, registerSetID: UInt32, dest: inout [UInt8]) throws -> ArraySlice<UInt8> {
                     dest.withUnsafeMutableBufferPointer { (ptr: inout UnsafeMutableBufferPointer<UInt8>) in
-                        UnsafeMutablePointer<UInt64>(ptr.baseAddress!).pointee = 0x1234567812345678
+                        ptr.baseAddress!.withMemoryRebound(to: UInt64.self, capacity: 1) {
+                            $0.pointee = 0x1234567812345678
+                        }
                     }
                     return dest.prefix(8)
                 }

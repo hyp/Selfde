@@ -102,11 +102,11 @@ private func getRegisterEntries(_ registerSets: [DNBRegisterSetInfo]) -> [Regist
 }
 
 struct DebuggerRegisterState {
-    private let registerSets: [DNBRegisterSetInfo]
-    private let registers: [RegisterMapEntry]
-    private var valueStorage: [UInt8]
-    private var savedRegisters: [UInt: [UInt8]] = [:]
-    private var saveRegisterID: UInt = 1
+    fileprivate let registerSets: [DNBRegisterSetInfo]
+    fileprivate let registers: [RegisterMapEntry]
+    fileprivate var valueStorage: [UInt8]
+    fileprivate var savedRegisters: [UInt: [UInt8]] = [:]
+    fileprivate var saveRegisterID: UInt = 1
 
     init(debugger: Debugger) {
         registerSets = getRegisterSets()

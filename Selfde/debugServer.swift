@@ -53,12 +53,12 @@ enum ResponseResult {
 struct DebugServerState {
     let debugger: Debugger
     var registerState: DebuggerRegisterState
-    private var processID: Int?
+    fileprivate var processID: Int?
 
-    private var continueThread = ThreadReference.all
-    private var currentThread = ThreadReference.all
+    fileprivate var continueThread = ThreadReference.all
+    fileprivate var currentThread = ThreadReference.all
 
-    private var currentThreadID: ThreadID {
+    fileprivate var currentThreadID: ThreadID {
         switch currentThread {
         case .id(let id):
             return id
@@ -67,7 +67,7 @@ struct DebugServerState {
         }
     }
 
-    private var continueThreadID: ThreadID {
+    fileprivate var continueThreadID: ThreadID {
         switch continueThread {
         case .id(let id):
             return id
@@ -77,10 +77,10 @@ struct DebugServerState {
     }
 
     // Should we send/check for ACK/NACKs and worry about the checksum?
-    private var noAckMode = false
+    fileprivate var noAckMode = false
     // Can commands like 'g' include the thread id?
-    private var threadSuffixSupported = false
-    private var listThreadsInStopReply = false
+    fileprivate var threadSuffixSupported = false
+    fileprivate var listThreadsInStopReply = false
 
     private(set) weak var logger: DebugServerLogger?
 
@@ -92,7 +92,7 @@ struct DebugServerState {
 }
 
 extension PacketParser {
-    private mutating func consumeThreadID() -> ThreadID? {
+    fileprivate mutating func consumeThreadID() -> ThreadID? {
         guard let value = consumeHexUInt64() else {
             return nil
         }
@@ -299,7 +299,7 @@ private enum ValueResponseResult<T> {
 }
 
 extension PacketParser {
-    private mutating func parseThreadReference() -> ValueResponseResult<ThreadReference> {
+    fileprivate mutating func parseThreadReference() -> ValueResponseResult<ThreadReference> {
         if consumeIfPresent("-") {
             guard consumeIfPresent("1") else {
                 return .none(.invalid("Invalid thread number"))
@@ -551,9 +551,9 @@ private func getHostProcessInfo(isHostInfo: Bool = true) -> String {
     #endif
     result.write("endian:little;") // FIXME: Any big endian targets?
     if isHostInfo {
-        result.write("ptrsize:\(sizeof(OpaquePointer.self));")
+        result.write("ptrsize:\(MemoryLayout<OpaquePointer>.size);")
     } else {
-        result.write("ptrsize:\(String(sizeof(OpaquePointer.self), radix: 16, uppercase: false))")
+        result.write("ptrsize:\(String(MemoryLayout<OpaquePointer>.size, radix: 16, uppercase: false))")
     }
     return result
 }
@@ -562,18 +562,18 @@ private func getCPUType(isHostInfo: Bool) -> (Int, Int)? {
     var type: UInt32 = 0
     var subtype: UInt32 = 0
     var is64BitCapable: UInt32 = 0
-    var err: Int32 = withUnsafeMutablePointer(&type) {
-        var size = sizeofValue(type)
+    var err: Int32 = withUnsafeMutablePointer(to: &type) {
+        var size = MemoryLayout<UInt32>.size
         return sysctlbyname("hw.cputype", $0, &size, nil, 0)
     }
-    err |= withUnsafeMutablePointer(&subtype) {
-        var size = sizeofValue(subtype)
+    err |= withUnsafeMutablePointer(to: &subtype) {
+        var size = MemoryLayout<UInt32>.size
         return sysctlbyname("hw.cpusubtype", $0, &size, nil, 0)
     }
     if isHostInfo {
         // Host info decides on the 64 bit based on the hardware capability.
-        err |= withUnsafeMutablePointer(&is64BitCapable) {
-            var size = sizeofValue(is64BitCapable)
+        err |= withUnsafeMutablePointer(to: &is64BitCapable) {
+            var size = MemoryLayout<UInt32>.size
             return sysctlbyname("hw.cpu64bit_capable", $0, &size, nil, 0)
         }
         if is64BitCapable != 0 {
@@ -598,9 +598,9 @@ private func handleQProcessInfo(_ server: inout DebugServerState, payload: Strin
 
     var processInfoRequest = [CTL_KERN, KERN_PROC, KERN_PROC_PID, Int32(processID)]
     var processInfo = kinfo_proc()
-    var processInfoSize = sizeofValue(processInfo)
+    var processInfoSize = MemoryLayout<kinfo_proc>.size
     if processInfoRequest.withUnsafeMutableBufferPointer({ (requestPtr: inout UnsafeMutableBufferPointer<Int32>) in
-        withUnsafeMutablePointer(&processInfo) { infoPtr in
+		withUnsafeMutablePointer(to: &processInfo) { infoPtr in
             sysctl(requestPtr.baseAddress, 4, infoPtr, &processInfoSize, nil, 0)
         }
     }) == 0 && processInfoSize > 0 {

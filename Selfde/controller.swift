@@ -23,14 +23,14 @@ public enum ControllerEvent {
 }
 
 /// Launches the controller thread.
-public func runSelfdeController(_ client: (Controller) -> (), errorCallback: (Error) -> ()) {
+public func runSelfdeController(_ client: @escaping (Controller) -> (), errorCallback: @escaping (Error) -> ()) {
     assert(Foundation.Thread.isMainThread)
 
     class ThreadContext {
         let callback: (Controller) -> ()
         let errorCallback: (Error) -> ()
 
-        init(callback: (Controller) -> (), errorCallback: (Error) -> ()) {
+        init(callback: @escaping (Controller) -> (), errorCallback: @escaping (Error) -> ()) {
             self.callback = callback
             self.errorCallback = errorCallback
         }
@@ -38,7 +38,7 @@ public func runSelfdeController(_ client: (Controller) -> (), errorCallback: (Er
 
     var controllerThread: pthread_t? = nil
     let context = ThreadContext(callback: client, errorCallback: errorCallback)
-    let result = pthread_create(&controllerThread, nil, { (pointer: UnsafeMutablePointer<Void>) in
+    let result = pthread_create(&controllerThread, nil, { pointer in
         let unmanagedContext = Unmanaged<ThreadContext>.fromOpaque(pointer)
         let controller: Controller
         do {
@@ -53,7 +53,7 @@ public func runSelfdeController(_ client: (Controller) -> (), errorCallback: (Er
         unmanagedContext.release()
         callback(controller)
         return nil
-    }, UnsafeMutablePointer(Unmanaged.passRetained(context).toOpaque()))
+    }, Unmanaged.passRetained(context).toOpaque())
     if result != 0 {
         errorCallback(ControllerError.threadLaunchFailure)
     }

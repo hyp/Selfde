@@ -7,9 +7,9 @@ import Darwin.Mach
 import Foundation
 
 public struct ControllerInterrupter {
-    private unowned let controller: Controller
+    fileprivate unowned let controller: Controller
 
-    public func sendInterrupt(_ function: @noescape () -> ()) {
+    public func sendInterrupt(_ function: () -> ()) {
         controller.interrupt(function)
     }
 }
@@ -72,7 +72,7 @@ public class Controller {
         try handleError(selfdeStartExceptionThread(&state))
     }
 
-    private func interrupt(_ function: @noescape () -> ()) {
+    fileprivate func interrupt(_ function: () -> ()) {
         conditionLock.lock()
         hasInterrupt = true
         function()
@@ -80,12 +80,12 @@ public class Controller {
         conditionLock.unlock()
     }
 
-    public func runUtilityThread(_ function: (ControllerInterrupter) -> ()) {
+    public func runUtilityThread(_ function: @escaping (ControllerInterrupter) -> ()) {
         final class UtilityThread: Foundation.Thread {
             unowned let controller: Controller
             let function: (ControllerInterrupter) -> ()
 
-            init(controller: Controller, function: (ControllerInterrupter) -> ()) {
+            init(controller: Controller, function: @escaping (ControllerInterrupter) -> ()) {
                 self.controller = controller
                 self.function = function
                 super.init()
@@ -149,9 +149,11 @@ public class Controller {
 
     public func getSharedLibraryInfoAddress() throws -> Address {
         var dyldInfo = task_dyld_info()
-        var count = mach_msg_type_number_t(sizeof(task_dyld_info.self) / sizeof(Int32.self))
-        let error = withUnsafeMutablePointer(&dyldInfo) {
-            task_info(self.state.task, task_flavor_t(TASK_DYLD_INFO), UnsafeMutablePointer<integer_t>($0), &count)
+        var count = mach_msg_type_number_t(MemoryLayout<task_dyld_info>.size / MemoryLayout<Int32>.size)
+        let error = withUnsafeMutablePointer(to: &dyldInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(self.state.task, task_flavor_t(TASK_DYLD_INFO), $0, &count)
+            }
         }
         try handleError(error)
         return Address(bitPattern: UInt(dyldInfo.all_image_info_addr))
@@ -170,7 +172,7 @@ public class Controller {
     }
 
     public func getThreads() throws -> [Thread] {
-        var threads = thread_act_port_array_t(nil)
+        var threads = thread_act_port_array_t(bitPattern: 0)
         var count = mach_msg_type_number_t(0)
         try handleError(task_threads(state.task, &threads, &count))
         var result = [Thread]()

@@ -82,11 +82,11 @@ public struct Thread {
     private func getBasicInfo() throws -> thread_basic_info {
         var infoData: thread_info_data_t = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0) // ?
         var size = mach_msg_type_number_t(THREAD_INFO_MAX)
-        try handleError(withUnsafeMutablePointer(&infoData) { pointer in
+        try handleError(withUnsafeMutablePointer(to: &infoData) { pointer in
             let statePtr = thread_info_t(OpaquePointer(pointer))
             return thread_info(thread, thread_flavor_t(THREAD_BASIC_INFO), statePtr, &size)
         })
-        return withUnsafePointer(&infoData) { pointer -> thread_basic_info in
+        return withUnsafePointer(to: &infoData) { pointer -> thread_basic_info in
             let basicInfoPtr = thread_basic_info_t(OpaquePointer(pointer))
             return basicInfoPtr.pointee
         }
@@ -94,9 +94,11 @@ public struct Thread {
 
     private func getIdentifierInfo() throws -> thread_identifier_info {
         var info = thread_identifier_info()
-        var size = mach_msg_type_number_t(sizeofValue(info) / sizeof(integer_t.self))
-        try handleError(withUnsafeMutablePointer(&info) { pointer in
-            thread_info(thread, thread_flavor_t(THREAD_IDENTIFIER_INFO), thread_info_t(pointer), &size)
+        var size = mach_msg_type_number_t(MemoryLayout<thread_identifier_info>.size / MemoryLayout<integer_t>.size)
+        try handleError(withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(size)) { pointer in
+                thread_info(thread, thread_flavor_t(THREAD_IDENTIFIER_INFO), pointer, &size)
+            }
         })
         return info
     }
