@@ -80,16 +80,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		FA1357751C7A4BF50049C7D0 /* Embed XPC Services */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "$(CONTENTS_FOLDER_PATH)/XPCServices";
-			dstSubfolderSpec = 16;
-			files = (
-			);
-			name = "Embed XPC Services";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		FA8C99431C7A0A5F00096693 /* Copy Files */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -297,7 +287,6 @@
 				FA68DF361C79BDEF00F3D838 /* Frameworks */,
 				FA68DF371C79BDEF00F3D838 /* Headers */,
 				FA68DF381C79BDEF00F3D838 /* Resources */,
-				FA1357751C7A4BF50049C7D0 /* Embed XPC Services */,
 			);
 			buildRules = (
 			);
