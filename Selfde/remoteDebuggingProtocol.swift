@@ -50,7 +50,7 @@ extension Collection where Self.Iterator.Element == UInt8, Self.Index == Int, Se
                 i = i.advanced(by: 2)
             case let byte:
                 output.append(byte)
-                i = (i + 1)
+                i += 1
             }
         }
         return output
@@ -86,18 +86,18 @@ func parsePackets(_ partialData: inout [UInt8], newData: ArraySlice<UInt8>, chec
         switch data[i] {
         case UInt8(ascii: "+"):
             packets.append(.ack)
-            i = (i + 1)
+            i += 1
         case UInt8(ascii: "-"):
             packets.append(.nack)
-            i = (i + 1)
+            i += 1
         case UInt8(ascii: "$"):
             // Find '#'
-            var j = (i + 1)
+            var j = i + 1
             while j < end {
                 if data[j] == UInt8(ascii: "#") {
                     break
                 }
-                j = (j + 1)
+                j += 1
             }
             guard (j + 3) <= end else {
                 // No end found.
@@ -108,10 +108,10 @@ func parsePackets(_ partialData: inout [UInt8], newData: ArraySlice<UInt8>, chec
             i = j
         case 0x03:
             packets.append(.interrupt)
-            i = (i + 1)
+            i += 1
         default:
             // Junk byte, Ignore.
-            i = (i + 1)
+            i += 1
         }
     }
 
