@@ -10,6 +10,7 @@ func handleError(_ error: mach_error_t) throws {
     guard error != KERN_SUCCESS else {
         return
     }
-    let message = String(cString: mach_error_string(error)) ?? "<no message>"
+    let cString = mach_error_string(error)
+    let message = cString.flatMap { String(cString: $0) } ?? "<no message>"
     throw ControllerError.machKernelError(code: Int(error), message: message)
 }
